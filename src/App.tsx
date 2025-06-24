@@ -704,8 +704,8 @@ function App({ user = null }: AppProps) {
 
       // Invoke Teams notification Lambda function with correct parameters
       const command = new InvokeCommand({
-        // FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
-        FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
+        FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
+        //FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
         Payload: JSON.stringify({
           submissionId,
           content: notificationContent,
@@ -1056,8 +1056,8 @@ function App({ user = null }: AppProps) {
 
         // Invoke DirectCloud upload Lambda function
         const command = new InvokeCommand({
-          // FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
-          FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
+          FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
+          //FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
           Payload: JSON.stringify({
             fileName: fileName,
             fileData: base64Data,
