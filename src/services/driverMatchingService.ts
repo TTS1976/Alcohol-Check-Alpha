@@ -53,7 +53,7 @@ export class DriverMatchingService {
    */
   static canUserApproveForDriver(
     currentUser: AppUser,
-    driverName: string,
+    _driverName: string,
     driverMatch: DriverMatch
   ): boolean {
     // SafeDrivingManager can approve everything
@@ -215,7 +215,7 @@ export class DriverMatchingService {
 
   private static kanjiHiraganaMatch(
     driverName: string,
-    users: GraphDirectReport[]
+    _users: GraphDirectReport[]
   ): DriverMatch {
     // This would implement more sophisticated Japanese name matching
     // For now, return no match as this requires more complex logic

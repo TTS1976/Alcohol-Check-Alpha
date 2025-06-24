@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import {
   PublicClientApplication,
-  AccountInfo,
   SilentRequest,
   InteractionRequiredAuthError,
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest } from '../config/authConfig';
-import { AuthContextType, AuthState, AppUser } from '../types/auth';
+import { AuthContextType, AuthState } from '../types/auth';
 import { GraphService } from '../services/graphService';
 import { UserRole } from '../config/authConfig';
 
