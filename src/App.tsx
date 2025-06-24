@@ -797,31 +797,36 @@ function App({ user = null }: AppProps) {
       
       if (registrationType === 'end') {
         drivingStatus = "運転終了";
-        // Find the latest start registration for this driver
+        // Find the latest start registration for this driver (include PENDING submissions for relationship)
         const startSubmissions = await client.models.AlcoholCheckSubmission.list({
           filter: {
             driverName: { eq: formData.driverName },
-            registrationType: { eq: '運転開始登録' },
-            approvalStatus: { eq: 'APPROVED' }
+            registrationType: { eq: '運転開始登録' }
+            // Removed approvalStatus filter to include PENDING submissions
           }
         });
+        console.log('🔍 Found start submissions for end registration:', startSubmissions.data?.length);
+        console.log('🔍 Start submissions:', startSubmissions.data?.map(s => ({ id: s.id, status: s.approvalStatus, submittedAt: s.submittedAt })));
         if (startSubmissions.data && startSubmissions.data.length > 0) {
           const latestStart = startSubmissions.data.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
+          console.log('🔗 Set relatedSubmissionId for end registration:', relatedSubmissionId);
         }
       } else if (registrationType === 'middle') {
-        // For middle registration, find the latest start registration for this driver
+        // For middle registration, find the latest start registration for this driver (include PENDING submissions for relationship)
         const startSubmissions = await client.models.AlcoholCheckSubmission.list({
           filter: {
             driverName: { eq: formData.driverName },
-            registrationType: { eq: '運転開始登録' },
-            approvalStatus: { eq: 'APPROVED' }
+            registrationType: { eq: '運転開始登録' }
+            // Removed approvalStatus filter to include PENDING submissions
           }
         });
+        console.log('🔍 Found start submissions for middle registration:', startSubmissions.data?.length);
         if (startSubmissions.data && startSubmissions.data.length > 0) {
           // Sort by submittedAt descending and pick the latest
           const latestStart = startSubmissions.data.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
+          console.log('🔗 Set relatedSubmissionId for middle registration:', relatedSubmissionId);
         }
       }
 
@@ -924,6 +929,14 @@ function App({ user = null }: AppProps) {
       }
       
       console.log('📋 Final submission data with all fields:', submissionData);
+      
+      // Debug the relationship setup
+      if (relatedSubmissionId) {
+        console.log('🔗 RELATIONSHIP ESTABLISHED:');
+        console.log('   📝 Creating:', submissionData.registrationType);
+        console.log('   🔗 Related to:', relatedSubmissionId);
+        console.log('   👤 Driver:', submissionData.driverName);
+      }
 
       console.log('Attempting to create submission with data:', submissionData);
       const result = await client.models.AlcoholCheckSubmission.create(submissionData);
