@@ -9,11 +9,11 @@ export const directcloudDownload = defineFunction({
     // Environment variables - VALUES SHOULD BE SET IN AMPLIFY CONSOLE FOR PRODUCTION
     // Using safe placeholder values for development/sandbox mode
     DIRECTCLOUD_BASE_URL: process.env.DIRECTCLOUD_BASE_URL || 'https://api.directcloud.jp',
-    DIRECTCLOUD_SERVICE: process.env.DIRECTCLOUD_SERVICE || 'dev-placeholder-service',
-    DIRECTCLOUD_SERVICE_KEY: process.env.DIRECTCLOUD_SERVICE_KEY || 'dev-placeholder-key',
-    DIRECTCLOUD_CODE: process.env.DIRECTCLOUD_CODE || 'dev-placeholder-code',
-    DIRECTCLOUD_ID: process.env.DIRECTCLOUD_ID || 'dev-placeholder-id',
-    DIRECTCLOUD_PASSWORD: process.env.DIRECTCLOUD_PASSWORD || 'dev-placeholder-password',
-    DIRECTCLOUD_UPLOAD_FOLDER: process.env.DIRECTCLOUD_UPLOAD_FOLDER || 'dev-placeholder-folder',
+    DIRECTCLOUD_SERVICE: process.env.DIRECTCLOUD_SERVICE || 'dmgklbdg',
+    DIRECTCLOUD_SERVICE_KEY: process.env.DIRECTCLOUD_SERVICE_KEY || 'f3b453325fb8cc6730e09b3e6c0a364ece9a2959b1489585fbd16b513916d226',
+    DIRECTCLOUD_CODE: process.env.DIRECTCLOUD_CODE || 'teraltechnoservice',
+    DIRECTCLOUD_ID: process.env.DIRECTCLOUD_ID || 'x-tts-system02@teral.co.jp',
+    DIRECTCLOUD_PASSWORD: process.env.DIRECTCLOUD_PASSWORD || 't7fDaQ94GCTPE2eAGgMw',
+    DIRECTCLOUD_UPLOAD_FOLDER: process.env.DIRECTCLOUD_UPLOAD_FOLDER || '1{200N8Gg5jUzC5',
   }
 }); 
