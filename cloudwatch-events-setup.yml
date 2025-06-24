@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudWatch Events for Alcohol Check Reminder Lambda Functions'
+
+Parameters:
+  DrivingEndReminderFunctionName:
+    Type: String
+    Description: 'The name of the driving end reminder Lambda function'
+    Default: 'amplify-[stack-name]-driving-end-reminder-[hash]'
+  
+  IntermediateCheckReminderFunctionName:
+    Type: String
+    Description: 'The name of the intermediate check reminder Lambda function'
+    Default: 'amplify-[stack-name]-intermediate-check-reminder-[hash]'
+
+Resources:
+  # EventBridge rule for Driving End Reminder - runs every minute to check for users needing reminders
+  DrivingEndReminderRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: 'alcohol-check-driving-end-reminder-rule'
+      Description: 'Triggers driving end reminder Lambda function every minute'
+      ScheduleExpression: 'rate(1 minute)'
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 
+            - 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}'
+            - FunctionName: !Ref DrivingEndReminderFunctionName
+          Id: 'DrivingEndReminderTarget'
+
+  # EventBridge rule for Intermediate Check Reminder - runs every hour to check for users needing reminders
+  IntermediateCheckReminderRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: 'alcohol-check-intermediate-reminder-rule'
+      Description: 'Triggers intermediate check reminder Lambda function every hour'
+      ScheduleExpression: 'rate(1 hour)'
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 
+            - 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}'
+            - FunctionName: !Ref IntermediateCheckReminderFunctionName
+          Id: 'IntermediateCheckReminderTarget'
+
+  # Permission for EventBridge to invoke Driving End Reminder Lambda
+  DrivingEndReminderInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DrivingEndReminderFunctionName
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt DrivingEndReminderRule.Arn
+
+  # Permission for EventBridge to invoke Intermediate Check Reminder Lambda
+  IntermediateCheckReminderInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref IntermediateCheckReminderFunctionName
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt IntermediateCheckReminderRule.Arn
+
+Outputs:
+  DrivingEndReminderRuleArn:
+    Description: 'ARN of the driving end reminder EventBridge rule'
+    Value: !GetAtt DrivingEndReminderRule.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DrivingEndReminderRuleArn'
+
+  IntermediateCheckReminderRuleArn:
+    Description: 'ARN of the intermediate check reminder EventBridge rule'
+    Value: !GetAtt IntermediateCheckReminderRule.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-IntermediateCheckReminderRuleArn' 

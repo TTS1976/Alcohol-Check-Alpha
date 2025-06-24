@@ -1,0 +1,9 @@
+{
+  "name": "send-teams-notification",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@aws-sdk/client-lambda": "^3.451.0"
+  }
+} 
