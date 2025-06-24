@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 // Temporarily disabled authentication
@@ -63,7 +63,7 @@ interface AppProps {
 }
 
 function App({ user = null }: AppProps) {
-  const { graphService } = useAuth();
+  const { graphService, logout } = useAuth();
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'main' | 'admin' | 'vehicles' | 'submissions' | 'safety' | 'approvals'>('main');
   const [registrationType, setRegistrationType] = useState<'start' | 'middle' | 'end' | null>(null);
@@ -72,10 +72,12 @@ function App({ user = null }: AppProps) {
   // Azure AD sign out functionality
   const signOut = async () => {
     try {
-      // This will be handled by the AuthProvider context
-      window.location.reload(); // Force reload to trigger logout
+      console.log('Signing out user...');
+      await logout(); // Properly call the logout function from AuthContext
     } catch (error) {
       console.error('Sign out error:', error);
+      // Fallback: force reload if logout fails
+      window.location.reload();
     }
   };
   
@@ -161,23 +163,31 @@ function App({ user = null }: AppProps) {
   // Check if current user has fullAdmin privileges in the database
   useEffect(() => {
     const checkUserFullAdminStatus = async () => {
-      if (!user || !user.mailNickname) {
+      if (!user || (!user.mailNickname && !user.email)) {
         setUserFullAdminStatus(false);
         return;
       }
 
       try {
-        const userNickname = user.mailNickname.toLowerCase();
+        const userEmail = user.email || user.mailNickname + '@domain.com';
         const result = await client.models.Driver.list({
           filter: { isDeleted: { eq: false } }
         });
         
         const matchedDriver = result.data.find(driver => {
           if (!driver.mail) return false;
-          const driverNickname = driver.mail.split('@')[0].toLowerCase();
-          return driverNickname === userNickname;
+          // Check both email and mailNickname matching
+          const driverEmail = driver.mail.toLowerCase();
+          const inputEmail = userEmail.toLowerCase();
+          const inputNickname = user.mailNickname?.toLowerCase();
+          
+          return driverEmail === inputEmail || 
+                 (inputNickname && driverEmail.includes(inputNickname)) ||
+                 (inputNickname && driver.mail.split('@')[0].toLowerCase() === inputNickname);
         });
 
+        console.log('Matched driver for fullAdmin check:', matchedDriver);
+        console.log('Setting userFullAdminStatus to:', matchedDriver?.fullAdmin || false);
         setUserFullAdminStatus(matchedDriver?.fullAdmin || false);
       } catch (error) {
         console.error('Failed to check user fullAdmin status:', error);
@@ -190,9 +200,24 @@ function App({ user = null }: AppProps) {
 
   // TEMPORARY: Give syed00 full admin privileges for testing
   const isFullAdmin = user?.role === 'SafeDrivingManager' || user?.mailNickname === 'syed00' || userFullAdminStatus;
-  const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || user?.mailNickname === 'syed00';
+  const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || user?.mailNickname === 'syed00' || userFullAdminStatus;
   const isViewerAdmin = isManager;
   const isAnyAdmin = isFullAdmin || isViewerAdmin;
+  
+  // Debug logging for permissions - wrapped in useEffect to prevent infinite loops
+  useEffect(() => {
+    console.log('Permission Debug:', {
+      user: user ? {
+        mailNickname: user.mailNickname,
+        role: user.role,
+        email: user.email
+      } : null,
+      userFullAdminStatus,
+      isFullAdmin,
+      isManager,
+      isAnyAdmin
+    });
+  }, [user, userFullAdminStatus, isFullAdmin, isManager, isAnyAdmin]);
   
   // TEMPORARY: Override user role for testing - give syed00 SafeDrivingManager access
   const tempUser = user?.mailNickname === 'syed00' ? { ...user, role: 'SafeDrivingManager' } : user;
@@ -201,6 +226,9 @@ function App({ user = null }: AppProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isImageUploaded, setIsImageUploaded] = useState(false);
+  
+  // Ref to track if driver name has been set to prevent infinite loops
+  const driverNameSetRef = useRef(false);
 
   // Wrap functions in useCallback to prevent recreation on each render
 
@@ -557,20 +585,11 @@ function App({ user = null }: AppProps) {
     if (user && user.mailNickname) {
       validateDriverRegistration();
     }
-    
-    // Auto-populate driver name from logged-in user
-    if (user && user.mailNickname && !formData.driverName) {
-      console.log('Auto-populating driver name:', user.mailNickname);
-      setFormData(prev => ({ 
-        ...prev, 
-        driverName: user.mailNickname 
-      }));
-    }
-  }, [registrationType, user, loadVehicles, loadAzureVehicles, loadAvailableConfirmers, validateDriverRegistration, formData.driverName]);
+  }, [registrationType, user, loadVehicles, loadAzureVehicles, loadAvailableConfirmers, validateDriverRegistration]);
 
   // Separate useEffect to ensure driver name is populated when user data becomes available
   useEffect(() => {
-    if (user && !formData.driverName) {
+    if (user && !formData.driverName && !driverNameSetRef.current) {
       // Try multiple methods to get the user identifier
       const driverName = user.mailNickname || 
                         user.email?.split('@')[0] || 
@@ -589,8 +608,15 @@ function App({ user = null }: AppProps) {
         ...prev, 
         driverName 
       }));
+      
+      driverNameSetRef.current = true;
     }
-  }, [user, formData.driverName]);
+  }, [user, formData.driverName]); // Keep formData.driverName but use ref to prevent infinite loops
+
+  // Reset the driver name ref when user changes
+  useEffect(() => {
+    driverNameSetRef.current = false;
+  }, [user]);
 
   // Check workflow state when user data is available
   useEffect(() => {
@@ -599,13 +625,13 @@ function App({ user = null }: AppProps) {
     }
   }, [user, checkUserWorkflowState]);
 
-  // Load confirmers when driver name is set
+  // Load confirmers when user changes (removed driver name dependency to prevent infinite loop)
   useEffect(() => {
-    if (formData.driverName && formData.driverName.trim() !== '') {
-      console.log('Driver name set, loading confirmers:', formData.driverName);
+    if (user) {
+      console.log('User available, loading confirmers for:', user.mailNickname || user.email);
       loadAvailableConfirmers();
     }
-  }, [formData.driverName, loadAvailableConfirmers]);
+  }, [user, loadAvailableConfirmers]);
 
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     if (field === 'inspectionResult' && typeof value === 'string') {

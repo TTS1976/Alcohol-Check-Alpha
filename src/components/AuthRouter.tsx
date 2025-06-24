@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import AzureLogin from './AzureLogin';
-import AdminRegistration from './AdminRegistration';
 import App from '../App';
 
 // Loading component
@@ -54,10 +53,6 @@ const AppWrapper: React.FC = () => {
     <Routes>
       <Route path="/" element={<AzureLogin />} />
       <Route path="/auth/callback" element={<LoadingScreen />} />
-      <Route 
-        path="/admin-register" 
-        element={<AdminRegistration onSignIn={() => {}} />} 
-      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -21,8 +21,13 @@ const AzureLogin: React.FC = () => {
   const handleLogin = async () => {
     try {
       await login();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
+      
+      // If interaction_in_progress error, suggest using the clear cache button
+      if (error?.message?.includes('interaction_in_progress')) {
+        console.log('Interaction in progress detected in AzureLogin, please use clear cache option');
+      }
     }
   };
 
@@ -52,6 +57,13 @@ const AzureLogin: React.FC = () => {
                   <h3 className="text-sm font-medium text-red-800">サインインエラー</h3>
                   <div className="mt-2 text-sm text-red-700">
                     <p>{error}</p>
+                    {error.includes('interaction_in_progress') && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-yellow-800 text-xs">
+                          💡 このエラーが発生した場合は、下の「キャッシュクリア & 新規ログイン」ボタンをお試しください。
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

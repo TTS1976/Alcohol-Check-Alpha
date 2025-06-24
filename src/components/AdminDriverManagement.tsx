@@ -272,23 +272,32 @@ const AdminDriverManagement: React.FC<AdminDriverManagementProps> = ({ onBack })
     const driver = drivers.find(d => d.id === driverId);
     if (!driver) return;
 
-    const confirmMessage = `${driver.name}のフル管理者権限を削除しますか？`;
+    const newStatus = !driver.fullAdmin;
+    const confirmMessage = newStatus 
+      ? `${driver.name}にフル管理者権限を付与しますか？`
+      : `${driver.name}のフル管理者権限を削除しますか？`;
     
     if (!confirm(confirmMessage)) return;
 
     try {
       await client.models.Driver.update({
         id: driverId,
-        fullAdmin: false, // Always remove privileges since we removed the grant section
+        fullAdmin: newStatus,
         updateUser: "guest", // getUserIdFromEmail(user?.signInDetails?.loginId || user?.username || ''),
         updateDate: new Date().toISOString(),
       });
       
-      setStatus(`${driver.name}のフル管理者権限を削除しました`);
+      const successMessage = newStatus 
+        ? `${driver.name}にフル管理者権限を付与しました`
+        : `${driver.name}のフル管理者権限を削除しました`;
+      setStatus(successMessage);
       loadDrivers();
     } catch (error) {
-      console.error('Failed to remove full admin privileges:', error);
-      setStatus('フル管理者権限の削除に失敗しました');
+      console.error('Failed to toggle full admin privileges:', error);
+      const errorMessage = newStatus 
+        ? 'フル管理者権限の付与に失敗しました'
+        : 'フル管理者権限の削除に失敗しました';
+      setStatus(errorMessage);
     }
   };
 
@@ -825,38 +834,72 @@ const AdminDriverManagement: React.FC<AdminDriverManagementProps> = ({ onBack })
               </ul>
             </div>
 
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-800">現在のフル管理者一覧</h3>
-              <div className="grid gap-3">
-                {drivers.filter(driver => driver.fullAdmin).map((driver) => (
-                  <div key={driver.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-md">
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800">{driver.name}</div>
-                      <div className="text-sm text-gray-600">{driver.mail}</div>
-                      <div className="text-sm text-gray-500">{driver.company} - {driver.employeeNo}</div>
+            <div className="space-y-6">
+              {/* Current Full Admins */}
+              <div>
+                <h3 className="font-medium text-gray-800 mb-3">現在のフル管理者一覧</h3>
+                <div className="grid gap-3">
+                  {drivers.filter(driver => driver.fullAdmin).map((driver) => (
+                    <div key={driver.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-md">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-800">{driver.name}</div>
+                        <div className="text-sm text-gray-600">{driver.mail}</div>
+                        <div className="text-sm text-gray-500">{driver.company} - {driver.employeeNo}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                          フル管理者
+                        </span>
+                        <button
+                          onClick={() => handleToggleFullAdmin(driver.id!)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                          title="フル管理者権限を削除"
+                        >
+                          権限削除
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-                        フル管理者
-                      </span>
-                      <button
-                        onClick={() => handleToggleFullAdmin(driver.id!)}
-                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                        title="フル管理者権限を削除"
-                      >
-                        権限削除
-                      </button>
+                  ))}
+                  {drivers.filter(driver => driver.fullAdmin).length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      現在、フル管理者権限を持つドライバーはいません
                     </div>
-                  </div>
-                ))}
-                {drivers.filter(driver => driver.fullAdmin).length === 0 && (
-                  <div className="text-center py-4 text-gray-500">
-                    現在、フル管理者権限を持つドライバーはいません
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-
+              {/* Regular Drivers (can be promoted to Full Admin) */}
+              <div>
+                <h3 className="font-medium text-gray-800 mb-3">一般ドライバー（フル管理者権限付与可能）</h3>
+                <div className="grid gap-3 max-h-96 overflow-y-auto">
+                  {drivers.filter(driver => !driver.fullAdmin).map((driver) => (
+                    <div key={driver.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-800">{driver.name}</div>
+                        <div className="text-sm text-gray-600">{driver.mail}</div>
+                        <div className="text-sm text-gray-500">{driver.company} - {driver.employeeNo}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+                          一般ドライバー
+                        </span>
+                        <button
+                          onClick={() => handleToggleFullAdmin(driver.id!)}
+                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                          title="フル管理者権限を付与"
+                        >
+                          権限付与
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {drivers.filter(driver => !driver.fullAdmin).length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      フル管理者権限を付与可能なドライバーはいません
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

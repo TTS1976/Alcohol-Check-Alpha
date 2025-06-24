@@ -75,6 +75,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
 
+      // Handle any redirect responses first
+      try {
+        const redirectResponse = await msalInstance.handleRedirectPromise();
+        if (redirectResponse) {
+          console.log('Handled redirect response successfully');
+          msalInstance.setActiveAccount(redirectResponse.account);
+          
+          // Build user profile after successful redirect login
+          const tempGraphService = new GraphService(getAccessToken);
+          const appUser = await tempGraphService.buildAppUser(redirectResponse.account);
+
+          setAuthState({
+            isAuthenticated: true,
+            isLoading: false,
+            user: appUser,
+            account: redirectResponse.account,
+            error: null,
+          });
+
+          setGraphService(tempGraphService);
+          return;
+        }
+      } catch (redirectError) {
+        console.error('Error handling redirect:', redirectError);
+        // Continue to check cached accounts
+      }
+
       const accounts = msalInstance.getAllAccounts();
       console.log('Checking auth state, found accounts:', accounts.length);
       
@@ -143,19 +170,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      // Force a fresh login by clearing any existing accounts first
-      const accounts = msalInstance.getAllAccounts();
-      if (accounts.length > 0) {
-        console.log('Clearing existing accounts to force fresh login');
+      // Check if there's already an interaction in progress
+      const inProgress = msalInstance.getActiveAccount();
+      if (inProgress) {
+        console.log('Clearing existing state before new login');
         await msalInstance.clearCache();
+        // Add small delay to ensure state is cleared
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      const response = await msalInstance.loginPopup({
-        ...loginRequest,
-        prompt: 'select_account', // Force account selection
-      });
+      // Handle any ongoing interactions
+      try {
+        await msalInstance.handleRedirectPromise();
+      } catch (handleError) {
+        console.log('No redirect to handle or error handling redirect:', handleError);
+      }
+
+      let response;
+      try {
+        response = await msalInstance.loginPopup({
+          ...loginRequest,
+          prompt: 'select_account', // Force account selection
+        });
+      } catch (popupError: any) {
+        // If popup is blocked or interaction_in_progress error, try redirect
+        if (popupError.errorCode === 'interaction_in_progress' || 
+            popupError.message?.includes('interaction_in_progress')) {
+          console.log('Interaction in progress detected, clearing and retrying...');
+          
+          // Force clear any ongoing interactions
+          await msalInstance.clearCache();
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Try again with redirect if popup fails
+          try {
+            response = await msalInstance.loginPopup({
+              ...loginRequest,
+              prompt: 'select_account',
+            });
+          } catch (retryError) {
+            console.log('Popup retry failed, using redirect method');
+            await msalInstance.loginRedirect({
+              ...loginRequest,
+              prompt: 'select_account',
+            });
+            return; // Exit here as redirect will handle the rest
+          }
+        } else {
+          throw popupError;
+        }
+      }
       
-      if (response.account) {
+      if (response && response.account) {
         msalInstance.setActiveAccount(response.account);
         
         // Build user profile after successful login
@@ -172,8 +238,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         setGraphService(tempGraphService);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
+      
+      // Clear cache on error to prevent stuck states
+      try {
+        await msalInstance.clearCache();
+      } catch (clearError) {
+        console.error('Failed to clear cache after login error:', clearError);
+      }
+      
       setAuthState(prev => ({
         ...prev,
         isLoading: false,
@@ -188,27 +262,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const account = msalInstance.getActiveAccount();
       
-      // Clear all cached data first
-      await msalInstance.clearCache();
-      
-      // Then perform logout
-      if (account) {
-        try {
-          await msalInstance.logoutPopup({
-            account: account,
-            mainWindowRedirectUri: msalConfig.auth.postLogoutRedirectUri || undefined,
-          });
-        } catch (logoutError) {
-          // If popup logout fails, try redirect logout
-          console.warn('Popup logout failed, trying redirect logout:', logoutError);
-          await msalInstance.logoutRedirect({
-            account: account,
-            postLogoutRedirectUri: msalConfig.auth.postLogoutRedirectUri || undefined,
-          });
-        }
+      // First, force clear any ongoing interactions
+      try {
+        await msalInstance.clearCache();
+        console.log('Cache cleared successfully');
+      } catch (clearError) {
+        console.error('Error clearing cache:', clearError);
       }
-
-      // Force state reset regardless of logout method
+      
+      // Reset local state immediately
       setAuthState({
         isAuthenticated: false,
         isLoading: false,
@@ -216,27 +278,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         account: null,
         error: null,
       });
-
       setGraphService(null);
       
-      // Reload the page to ensure clean state
-      window.location.reload();
+      // Then attempt logout with the server
+      if (account) {
+        try {
+          await msalInstance.logoutPopup({
+            account: account,
+            mainWindowRedirectUri: msalConfig.auth.postLogoutRedirectUri || undefined,
+          });
+          console.log('Popup logout completed');
+        } catch (logoutError: any) {
+          console.warn('Popup logout failed, trying redirect logout:', logoutError);
+          
+          // If popup logout fails, clear everything and use redirect
+          try {
+            // Clear everything again before redirect
+            await msalInstance.clearCache();
+            await msalInstance.logoutRedirect({
+              account: account,
+              postLogoutRedirectUri: msalConfig.auth.postLogoutRedirectUri || undefined,
+            });
+          } catch (redirectError) {
+            console.error('Redirect logout also failed:', redirectError);
+            // Force clean state and reload
+            window.location.reload();
+          }
+        }
+      }
+      
+      // Small delay before reload to ensure logout completes
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
       
     } catch (error) {
       console.error('Logout failed:', error);
       
-      // Even if logout fails, clear local state
+      // Force clear everything even if logout fails
+      try {
+        await msalInstance.clearCache();
+      } catch (clearError) {
+        console.error('Final cache clear failed:', clearError);
+      }
+      
+      // Reset state regardless
       setAuthState({
         isAuthenticated: false,
         isLoading: false,
         user: null,
         account: null,
-        error: error instanceof Error ? error.message : 'Logout failed',
+        error: null,
       });
-      
       setGraphService(null);
       
-      // Force page reload as fallback
+      // Force page reload as final fallback
       setTimeout(() => window.location.reload(), 1000);
     }
   };
