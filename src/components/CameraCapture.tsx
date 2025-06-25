@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import * as faceapi from 'face-api.js';
 import './CameraCapture.css';
 
 interface CameraCaptureProps {
@@ -6,37 +7,359 @@ interface CameraCaptureProps {
   autoOpen?: boolean;
 }
 
+interface FaceOrientationData {
+  isFacingForward: boolean;
+  confidence: number;
+  message: string;
+}
+
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = false }) => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isAccessingCamera, setIsAccessingCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [faceOrientation, setFaceOrientation] = useState<FaceOrientationData>({
+    isFacingForward: false,
+    confidence: 0,
+    message: 'カメラの前に正面を向いてください'
+  });
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Load Face-api.js models
+  const loadModels = useCallback(async () => {
+    try {
+      console.log('🔄 Loading Face-api.js models...');
+      
+      // Try multiple CDN sources
+      const MODEL_URLS = [
+        'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights',
+        'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
+        './models' // Local fallback
+      ];
+      
+      let modelsLoaded = false;
+      
+      for (const MODEL_URL of MODEL_URLS) {
+        try {
+          console.log(`Trying to load models from: ${MODEL_URL}`);
+          
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+          ]);
+          
+          console.log('✅ Face-api.js models loaded successfully');
+          setIsModelLoaded(true);
+          modelsLoaded = true;
+          break;
+        } catch (urlError) {
+          console.warn(`Failed to load from ${MODEL_URL}:`, urlError);
+          continue;
+        }
+      }
+      
+      if (!modelsLoaded) {
+        throw new Error('All model loading attempts failed');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load Face-api.js models:', error);
+      setCameraError('顔認識モデルの読み込みに失敗しました。インターネット接続を確認してください。');
+    }
+  }, []);
+
+  // Simplified face detection - only runs when manually checking
+  const checkFaceForCapture = useCallback(async (): Promise<boolean> => {
+    if (!videoRef.current || !canvasRef.current || !isModelLoaded) {
+      return false;
+    }
+
+    const video = videoRef.current;
+
+    try {
+      // Detect face with strict settings
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ 
+          inputSize: 320,
+          scoreThreshold: 0.7 // Very strict threshold
+        }))
+        .withFaceLandmarks();
+
+      if (detection) {
+        const orientation = analyzeStrictFaceOrientation(detection, video.videoWidth, video.videoHeight);
+        
+        console.log('Face analysis result:', {
+          isFacingForward: orientation.isFacingForward,
+          confidence: Math.round(orientation.confidence * 100),
+          message: orientation.message
+        });
+        
+        return orientation.isFacingForward;
+      } else {
+        console.log('No face detected');
+        return false;
+      }
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return false;
+    }
+  }, [isModelLoaded]);
+
+  // Very strict face orientation analysis
+  const analyzeStrictFaceOrientation = (detection: faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection; }, faceapi.FaceLandmarks68>, canvasWidth: number, canvasHeight: number): FaceOrientationData => {
+    const landmarks = detection.landmarks;
+    const faceBox = detection.detection.box;
+    
+    // Get key facial points
+    const nose = landmarks.getNose();
+    const leftEye = landmarks.getLeftEye();
+    const rightEye = landmarks.getRightEye();
+    
+    // Calculate face center
+    const faceCenter = {
+      x: faceBox.x + faceBox.width / 2,
+      y: faceBox.y + faceBox.height / 2
+    };
+    
+    // Get nose tip (center point of nose)
+    const noseTip = nose[3];
+    
+    // Calculate horizontal offset of nose from face center
+    const noseOffset = Math.abs(noseTip.x - faceCenter.x);
+    const faceWidth = faceBox.width;
+    const relativeNoseOffset = noseOffset / faceWidth;
+    
+    // Calculate eye positions
+    const leftEyeCenter = leftEye.reduce((acc, point) => ({ 
+      x: acc.x + point.x, 
+      y: acc.y + point.y 
+    }), { x: 0, y: 0 });
+    leftEyeCenter.x /= leftEye.length;
+    leftEyeCenter.y /= leftEye.length;
+    
+    const rightEyeCenter = rightEye.reduce((acc, point) => ({ 
+      x: acc.x + point.x, 
+      y: acc.y + point.y 
+    }), { x: 0, y: 0 });
+    rightEyeCenter.x /= rightEye.length;
+    rightEyeCenter.y /= rightEye.length;
+    
+    const eyeDistance = Math.abs(rightEyeCenter.x - leftEyeCenter.x);
+    const eyeVerticalDiff = Math.abs(rightEyeCenter.y - leftEyeCenter.y);
+    const eyeAlignment = eyeVerticalDiff / eyeDistance;
+    
+    // Check if both eyes are reasonably visible (not strict profile view)
+    const leftEyeVisible = leftEye.filter(point => 
+      point.x > 5 && point.x < canvasWidth - 5 && 
+      point.y > 5 && point.y < canvasHeight - 5
+    ).length >= leftEye.length * 0.7; // 70% of eye points visible
+    
+    const rightEyeVisible = rightEye.filter(point => 
+      point.x > 5 && point.x < canvasWidth - 5 && 
+      point.y > 5 && point.y < canvasHeight - 5
+    ).length >= rightEye.length * 0.7; // 70% of eye points visible
+    
+    const eyesVisibleInFrame = leftEyeVisible && rightEyeVisible;
+    
+    // Detection confidence from Face-api.js
+    const detectionConfidence = detection.detection.score;
+    
+    // More lenient thresholds for practical use
+    const NOSE_OFFSET_THRESHOLD = 0.2; // Moderately centered nose
+    const EYE_ALIGNMENT_THRESHOLD = 0.15; // Reasonably aligned eyes
+    const MIN_CONFIDENCE = 0.5; // Moderate confidence
+    const MIN_FACE_SIZE = 80; // Reasonable minimum face size
+    const MIN_EYE_DISTANCE = 25; // Minimum distance between eyes (front-facing)
+    
+    // Conditions check
+    const isNoseCentered = relativeNoseOffset < NOSE_OFFSET_THRESHOLD;
+    const areEyesAligned = eyeAlignment < EYE_ALIGNMENT_THRESHOLD;
+    const isConfident = detectionConfidence > MIN_CONFIDENCE;
+    const isBigEnough = faceWidth > MIN_FACE_SIZE;
+    const hasGoodEyeDistance = eyeDistance > MIN_EYE_DISTANCE;
+    const areEyesVisible = eyesVisibleInFrame;
+    
+    // Overall confidence calculation
+    let confidence = detectionConfidence;
+    if (isNoseCentered) confidence += 0.1;
+    if (areEyesAligned) confidence += 0.1;
+    if (hasGoodEyeDistance) confidence += 0.1;
+    if (areEyesVisible) confidence += 0.1;
+    confidence = Math.min(confidence, 1.0);
+    
+    // More practical decision - most conditions should be met
+    const criticalConditions = [isConfident, isBigEnough, areEyesVisible].filter(Boolean).length;
+    const orientationConditions = [isNoseCentered, areEyesAligned, hasGoodEyeDistance].filter(Boolean).length;
+    
+    // Need all critical conditions + at least 2 orientation conditions
+    const isFacingForward = criticalConditions === 3 && orientationConditions >= 2;
+    
+    // Generate message
+    let message = '';
+    if (!isBigEnough) {
+      message = 'カメラに近づいてください';
+    } else if (!isConfident) {
+      message = '顔をもっとはっきりと映してください';
+    } else if (!areEyesVisible) {
+      message = '両目がはっきり見えるようにしてください';
+    } else if (!hasGoodEyeDistance) {
+      message = '正面を向いてください（横顔になっています）';
+    } else if (!areEyesAligned) {
+      message = '頭をまっすぐにしてください';
+    } else if (!isNoseCentered) {
+      message = 'もう少し正面を向いてください';
+    } else {
+      message = '✓ 正面を向いています - 撮影可能です';
+    }
+    
+    return {
+      isFacingForward,
+      confidence,
+      message
+    };
+  };
+
+  // Real-time face detection display
+  const updateFaceDetection = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || !isModelLoaded) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Always draw the video frame first
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    try {
+      // Detect face with landmarks for display
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ 
+          inputSize: 320,
+          scoreThreshold: 0.5 // Slightly lower for display
+        }))
+        .withFaceLandmarks();
+
+      if (detection) {
+        // Analyze face orientation for display
+        const orientation = analyzeStrictFaceOrientation(detection, canvas.width, canvas.height);
+        setFaceOrientation(orientation);
+
+        // Draw face detection overlay
+        drawFaceOverlay(ctx, detection, orientation);
+      } else {
+        setFaceOrientation({
+          isFacingForward: false,
+          confidence: 0,
+          message: '顔が検出されません'
+        });
+        
+        // Draw center guidelines when no face detected
+        drawCenterGuidelines(ctx, canvas.width, canvas.height);
+      }
+    } catch (error) {
+      console.error('Face detection error:', error);
+      setFaceOrientation({
+        isFacingForward: false,
+        confidence: 0,
+        message: '顔認識エラー'
+      });
+      
+      // Draw center guidelines on error
+      drawCenterGuidelines(ctx, canvas.width, canvas.height);
+    }
+  }, [isModelLoaded]);
+
+  // Draw center guidelines
+  const drawCenterGuidelines = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    
+    // Vertical center line
+    ctx.beginPath();
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(width / 2, height);
+    ctx.stroke();
+    
+    // Horizontal center line
+    ctx.beginPath();
+    ctx.moveTo(0, height / 2);
+    ctx.lineTo(width, height / 2);
+    ctx.stroke();
+    
+    ctx.setLineDash([]);
+  };
+
+  // Draw face detection overlay
+  const drawFaceOverlay = (ctx: CanvasRenderingContext2D, detection: faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection; }, faceapi.FaceLandmarks68>, orientation: FaceOrientationData) => {
+    const box = detection.detection.box;
+    const landmarks = detection.landmarks;
+    
+    // Set colors based on orientation
+    const color = orientation.isFacingForward ? '#00ff00' : '#ff4444';
+    const bgColor = orientation.isFacingForward ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 68, 68, 0.1)';
+    
+    // Draw face bounding box
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+    
+    // Fill face area
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(box.x, box.y, box.width, box.height);
+    
+    // Draw key landmarks
+    ctx.fillStyle = color;
+    
+    // Draw nose
+    const nose = landmarks.getNose();
+    nose.forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+    
+    // Draw eyes
+    const leftEye = landmarks.getLeftEye();
+    const rightEye = landmarks.getRightEye();
+    [...leftEye, ...rightEye].forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+    
+    // Draw center guidelines
+    drawCenterGuidelines(ctx, ctx.canvas.width, ctx.canvas.height);
+  };
+
+  // Initialize
   useEffect(() => {
-    // Cleanup function to stop camera when component unmounts
+    loadModels();
+    
+    // Cleanup
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
     };
-  }, []);
+  }, [loadModels]);
 
-  // Auto-open camera when component mounts if autoOpen is true
+  // Auto-open camera
   useEffect(() => {
-    if (autoOpen && !isAccessingCamera && !isCameraOpen && !capturedImage) {
+    if (autoOpen && !isAccessingCamera && !isCameraOpen && !capturedImage && isModelLoaded) {
       console.log("Auto-opening camera...");
       openCamera();
     }
-  }, [autoOpen]);
-
-  // This effect will run after the video element is rendered
-  useEffect(() => {
-    if (isAccessingCamera && videoRef.current) {
-      initializeCamera();
-    }
-  }, [isAccessingCamera]);
+  }, [autoOpen, isModelLoaded]);
 
   const openCamera = () => {
     setCameraError(null);
@@ -62,51 +385,74 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         
-        // Make sure video starts playing
-        videoRef.current.onloadedmetadata = () => {
+        videoRef.current.onloadedmetadata = async () => {
           console.log("Video metadata loaded, playing video...");
-          if (videoRef.current) {
-            videoRef.current.play()
-              .then(() => {
-                console.log("Video is now playing");
-                setIsCameraOpen(true);
-              })
-              .catch(err => {
-                console.error("Error playing video:", err);
-                setCameraError("Could not play video stream: " + err.message);
-                setIsAccessingCamera(false);
-              });
+          if (videoRef.current && canvasRef.current) {
+            try {
+              await videoRef.current.play();
+              console.log("Video is now playing");
+              
+              // Set canvas dimensions
+              canvasRef.current.width = videoRef.current.videoWidth;
+              canvasRef.current.height = videoRef.current.videoHeight;
+              
+              setIsCameraOpen(true);
+              
+              // Start real-time face detection (300ms for balanced performance)
+              detectionIntervalRef.current = setInterval(updateFaceDetection, 300);
+              
+            } catch (err) {
+              console.error("Error playing video:", err);
+              setCameraError("Could not play video stream: " + (err as Error).message);
+              setIsAccessingCamera(false);
+            }
           }
         };
         
         setCapturedImage(null);
       } else {
-        console.error("Video reference is not available");
         setCameraError("Video element not available");
         setIsAccessingCamera(false);
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
       setCameraError(`Unable to access camera: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      alert('Unable to access camera. Please ensure you have given permission.');
       setIsAccessingCamera(false);
     }
   };
 
-  const captureImage = () => {
-    if (videoRef.current && isCameraOpen) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg');
-        setCapturedImage(imageData);
-        // After capturing, stop the camera stream to save resources
-        stopCamera();
-      }
+  // Initialize camera when accessing
+  useEffect(() => {
+    if (isAccessingCamera && videoRef.current && isModelLoaded) {
+      initializeCamera();
+    }
+  }, [isAccessingCamera, isModelLoaded]);
+
+  const captureImage = async () => {
+    if (!videoRef.current || !isCameraOpen) {
+      alert('カメラが利用できません');
+      return;
+    }
+
+    // Check face orientation before capture
+    const isFaceValid = await checkFaceForCapture();
+    
+    if (!isFaceValid) {
+      alert('正面を向いてから撮影してください。\n両目がはっきり見え、顔全体がカメラに映っている必要があります。');
+      return;
+    }
+
+    // Capture the image
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const imageData = canvas.toDataURL('image/jpeg');
+      setCapturedImage(imageData);
+      stopCamera();
     }
   };
 
@@ -114,9 +460,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
-      setIsCameraOpen(false);
-      setIsAccessingCamera(false);
     }
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
+    }
+    setIsCameraOpen(false);
+    setIsAccessingCamera(false);
+    setFaceOrientation({
+      isFacingForward: false,
+      confidence: 0,
+      message: 'カメラの前に正面を向いてください'
+    });
   };
 
   const resetCapture = () => {
@@ -128,7 +483,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     if (capturedImage && onImageSend) {
       onImageSend(capturedImage);
       alert('Image sent successfully!');
-      // Reset after sending
       setCapturedImage(null);
     } else {
       alert('Please capture an image first');
@@ -138,8 +492,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
   return (
     <div className="camera-capture">
       {!isAccessingCamera && !capturedImage && (
-        <button className="camera-button" onClick={openCamera}>
-          Open Camera
+        <button className="camera-button" onClick={openCamera} disabled={!isModelLoaded}>
+          {isModelLoaded ? 'Open Camera' : 'Loading Face Detection...'}
         </button>
       )}
 
@@ -154,21 +508,65 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
         <div className="camera-container">
           <div className="video-wrapper">
             {!isCameraOpen && isAccessingCamera && (
-              <div className="camera-loading">Accessing camera...</div>
+              <div className="camera-loading">
+                Accessing camera and loading face detection...
+              </div>
             )}
+            
+            {/* Hidden video element */}
             <video 
               ref={videoRef} 
               autoPlay 
               playsInline 
               muted
-              style={{ display: 'block', width: '100%', height: 'auto', backgroundColor: '#000' }}
+              style={{ display: 'none' }}
             />
+            
+            {/* Canvas for video display */}
+            <canvas 
+              ref={canvasRef}
+              className="face-detection-canvas"
+              style={{ 
+                display: 'block', 
+                width: '100%', 
+                height: 'auto', 
+                backgroundColor: '#000',
+                borderRadius: '8px'
+              }}
+            />
+            
             {isCameraOpen && (
-              <div className="camera-status">Camera active</div>
+              <div className={`face-status-mini ${faceOrientation.isFacingForward ? 'status-ready' : 'status-waiting'}`}>
+                {faceOrientation.isFacingForward ? '✓ 撮影可能' : '⚠ 顔を確認中...'}
+              </div>
             )}
           </div>
+          
+          {/* Status Information Below Camera */}
+          {isCameraOpen && (
+            <div className="camera-status-info">
+              <div className="status-main">
+                <span className={`status-icon ${faceOrientation.isFacingForward ? 'ready' : 'waiting'}`}>
+                  {faceOrientation.isFacingForward ? '✓' : '⚠'}
+                </span>
+                <span className="status-text">
+                  {faceOrientation.message}
+                </span>
+              </div>
+              <div className="status-details">
+                信頼度: {Math.round(faceOrientation.confidence * 100)}% (Face-api.js)
+              </div>
+            </div>
+          )}
+          
           <div className="camera-controls">
-            <button onClick={captureImage} disabled={!isCameraOpen}>撮影</button>
+            <button 
+              onClick={captureImage} 
+              disabled={!isCameraOpen}
+              className={isCameraOpen ? 'capture-ready' : 'capture-disabled'}
+            >
+              撮影
+            </button>
             <button onClick={stopCamera}>閉じる</button>
           </div>
         </div>
