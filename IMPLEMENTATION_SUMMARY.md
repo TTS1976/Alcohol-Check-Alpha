@@ -25,6 +25,35 @@ I've successfully created two new Lambda functions for auto-triggered Teams noti
   - Only reminds users who haven't submitted 中間点呼登録
   - Sends reminders at 0:00, 6:00, 12:00, 18:00 JST (every 6 hours)
 
+## 🔄 **Updated Intermediate Roll Call Logic**
+
+### **New Multi-Day Trip Workflow**
+The system now implements a more sophisticated workflow for multi-day trips:
+
+**Trip Duration Requirements:**
+- **1-2 Days (0-1 nights)**: No intermediate roll calls needed
+  - Example: `5/26～5/27` → 運転開始 → 運転終了
+  
+- **3+ Days (2+ nights)**: Intermediate roll calls required for each day, INCLUDING the final day
+  - Example: `5/26～5/30` → 
+    - `5/26`: 運転開始
+    - `5/27`: 中間点呼登録 (Day 2)
+    - `5/28`: 中間点呼登録 (Day 3) 
+    - `5/29`: 中間点呼登録 (Day 4)
+    - `5/30`: 中間点呼登録 (Final day - **REQUIRED**)
+    - `5/30`: 運転終了登録 (Only available after final day intermediate)
+
+**Workflow State Logic:**
+1. **After 運転開始登録**: Check trip duration
+   - 1-2 days → Enable 運転終了登録
+   - 3+ days → Enable 中間点呼登録
+
+2. **After each 中間点呼登録**: Check if current date matches alighting date
+   - **Not final day** → Enable another 中間点呼登録
+   - **Final day** → Enable 運転終了登録
+
+This ensures proper safety checks are conducted on every day of the trip, including the critical final day before driving concludes.
+
 ## 📁 Files Created
 
 ### Lambda Functions
@@ -116,8 +145,9 @@ CloudWatch Events: rate(1 hour)
 ├─ Checks current time in JST
 ├─ Processes only at 0:00, 6:00, 12:00, 18:00
 └─ Sends notification if:
-   ├─ Boarding and alighting on different dates
-   └─ No 中間点呼登録 submitted
+   ├─ Trip duration is 3+ days (2+ nights)
+   ├─ Current day requires 中間点呼登録 (including final day)
+   └─ No 中間点呼登録 submitted for current day
 ```
 
 ## 🎛️ Configuration

@@ -117,8 +117,18 @@ function App({ user = null }: AppProps) {
   const [driverValidationMessage, setDriverValidationMessage] = useState<string>('');
   
   // Workflow state management
-  const [currentWorkflowState, setCurrentWorkflowState] = useState<'initial' | 'needsMiddle' | 'needsEnd' | 'completed'>('initial');
+  const [currentWorkflowState, setCurrentWorkflowState] = useState<'initial' | 'needsMiddle' | 'needsEnd' | 'completed' | 'waitingForNextDay'>('initial');
   const [isWorkflowLoading, setIsWorkflowLoading] = useState(true);
+  const [tripProgress, setTripProgress] = useState<{
+    totalDays: number;
+    totalIntermediatesNeeded: number;
+    completedIntermediates: number;
+    remainingIntermediates: number;
+    isAlightingDay: boolean;
+    hasIntermediateToday: boolean;
+    canDoIntermediate: boolean;
+    isComplete: boolean;
+  } | null>(null);
   const purposeOptions = ['営業', '現地調査', '現場監督', '緊急対応', 'その他'];
 
   // Driving rules options
@@ -529,23 +539,63 @@ function App({ user = null }: AppProps) {
           console.log('🔍 Latest is end registration, setting to initial state');
           setCurrentWorkflowState('initial');
         } else if (latestSubmission.registrationType === '中間点呼登録') {
-          console.log('🔍 Latest is middle registration, setting to needsEnd state');
-          setCurrentWorkflowState('needsEnd');
-        } else if (latestSubmission.registrationType === '運転開始登録') {
-          // Check if dates are different
-          const boardingDate = new Date(latestSubmission.boardingDateTime || '').toDateString();
-          const alightingDate = new Date(latestSubmission.alightingDateTime || '').toDateString();
+          console.log('🔍 Latest is middle registration, checking trip progress');
           
-          console.log('🔍 Comparing dates:');
-          console.log('🔍 Boarding date:', boardingDate);
-          console.log('🔍 Alighting date:', alightingDate);
-          console.log('🔍 Are dates different?', boardingDate !== alightingDate);
+          const progress = await getTripProgress(latestSubmission.driverName || '');
+          setTripProgress(progress);
           
-          if (boardingDate !== alightingDate) {
-            console.log('🔍 Different dates, setting to needsMiddle state');
-            setCurrentWorkflowState('needsMiddle');
+          if (progress) {
+            console.log('🔍 Trip progress:', progress);
+            
+            if (progress.isComplete) {
+              console.log('🔍 All intermediates completed, enabling end registration');
+              setCurrentWorkflowState('needsEnd');
+            } else if (progress.canDoIntermediate) {
+              console.log('🔍 Can do more intermediates');
+              setCurrentWorkflowState('needsMiddle');
+            } else {
+              console.log('🔍 Already did intermediate today, wait for tomorrow');
+              setCurrentWorkflowState('waitingForNextDay');
+            }
           } else {
-            console.log('🔍 Same date, setting to needsEnd state');
+            console.log('🔍 Could not get trip progress, defaulting to needsEnd');
+            setCurrentWorkflowState('needsEnd');
+          }
+        } else if (latestSubmission.registrationType === '運転開始登録') {
+          // Check if intermediate roll calls are needed based on trip duration
+          const boardingDate = new Date(latestSubmission.boardingDateTime || '');
+          const alightingDate = new Date(latestSubmission.alightingDateTime || '');
+          
+          // Calculate the number of days between boarding and alighting
+          const timeDiff = alightingDate.getTime() - boardingDate.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+          
+          console.log('🔍 Trip duration analysis:');
+          console.log('🔍 Boarding date:', boardingDate.toDateString());
+          console.log('🔍 Alighting date:', alightingDate.toDateString());
+          console.log('🔍 Days difference:', daysDiff);
+          
+          // Intermediate roll calls are required for trips of 3+ days (2+ nights)
+          // Examples:
+          // - 5/26～5/27 (1 night, 2 days): No intermediate needed
+          // - 5/26～5/28 (2 nights, 3 days): Intermediate needed
+          // - 5/26～5/30 (4 nights, 5 days): Intermediate needed
+          if (daysDiff >= 3) {
+            console.log('🔍 Trip is 3+ days (2+ nights), intermediate roll calls required');
+            
+            // Get trip progress for this driver
+            const progress = await getTripProgress(latestSubmission.driverName || '');
+            setTripProgress(progress);
+            
+            if (progress && progress.canDoIntermediate) {
+              setCurrentWorkflowState('needsMiddle');
+            } else if (progress && progress.hasIntermediateToday && !progress.isAlightingDay) {
+              setCurrentWorkflowState('waitingForNextDay');
+            } else {
+              setCurrentWorkflowState('needsMiddle');
+            }
+          } else {
+            console.log('🔍 Trip is 1-2 days (0-1 nights), no intermediate roll calls needed');
             setCurrentWorkflowState('needsEnd');
           }
         } else {
@@ -617,6 +667,73 @@ function App({ user = null }: AppProps) {
   useEffect(() => {
     driverNameSetRef.current = false;
   }, [user]);
+
+  // Function to get trip progress information
+  const getTripProgress = useCallback(async (driverName: string) => {
+    try {
+      // Find the latest start submission for this driver
+      const startSubmissions = await client.models.AlcoholCheckSubmission.list({
+        filter: {
+          driverName: { eq: driverName },
+          registrationType: { eq: '運転開始登録' },
+          approvalStatus: { ne: 'REJECTED' }
+        }
+      });
+
+      if (!startSubmissions.data || startSubmissions.data.length === 0) {
+        return null;
+      }
+
+      const latestStart = startSubmissions.data.sort((a, b) => 
+        new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime()
+      )[0];
+
+      const boardingDate = new Date(latestStart.boardingDateTime || '');
+      const alightingDate = new Date(latestStart.alightingDateTime || '');
+      const currentDate = new Date();
+
+      // Calculate total trip duration
+      const totalDays = Math.ceil((alightingDate.getTime() - boardingDate.getTime()) / (1000 * 3600 * 24));
+      const totalIntermediatesNeeded = totalDays - 1; // One intermediate for each day except start day
+
+      // Get all intermediate submissions for this trip
+      const intermediateSubmissions = await client.models.AlcoholCheckSubmission.list({
+        filter: {
+          driverName: { eq: driverName },
+          registrationType: { eq: '中間点呼登録' },
+          relatedSubmissionId: { eq: latestStart.id },
+          approvalStatus: { ne: 'REJECTED' }
+        }
+      });
+
+      const completedIntermediates = intermediateSubmissions.data?.length || 0;
+      const remainingIntermediates = Math.max(0, totalIntermediatesNeeded - completedIntermediates);
+
+      // Check if today is the alighting day (final day)
+      const isAlightingDay = currentDate.toDateString() === alightingDate.toDateString();
+
+      // Check if we already did an intermediate today (prevent duplicates except on final day)
+      const todayStr = currentDate.toDateString();
+      const hasIntermediateToday = intermediateSubmissions.data?.some(sub => {
+        const subDate = new Date(sub.submittedAt || '');
+        return subDate.toDateString() === todayStr;
+      }) || false;
+
+      return {
+        totalDays,
+        totalIntermediatesNeeded,
+        completedIntermediates,
+        remainingIntermediates,
+        isAlightingDay,
+        hasIntermediateToday,
+        canDoIntermediate: isAlightingDay || !hasIntermediateToday, // Allow on final day for catch-up
+        isComplete: remainingIntermediates <= 0
+      };
+    } catch (error) {
+      console.error('Error getting trip progress:', error);
+      return null;
+    }
+  }, []);
 
   // Check workflow state when user data is available
   useEffect(() => {
@@ -704,8 +821,8 @@ function App({ user = null }: AppProps) {
 
       // Invoke Teams notification Lambda function with correct parameters
       const command = new InvokeCommand({
-        FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
-        //FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
+        //FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
+        FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
         Payload: JSON.stringify({
           submissionId,
           content: notificationContent,
@@ -1065,8 +1182,8 @@ function App({ user = null }: AppProps) {
 
         // Invoke DirectCloud upload Lambda function
         const command = new InvokeCommand({
-          FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
-          //FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
+          //FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
+          FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
           Payload: JSON.stringify({
             fileName: fileName,
             fileData: base64Data,
@@ -1468,28 +1585,94 @@ function App({ user = null }: AppProps) {
                 )}
                 
                 {isRegisteredDriver === true && !isWorkflowLoading && (
-                  <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg max-w-2xl mx-auto">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">✅</span>
-                      <div>
-                        <p className="font-semibold">
-                          現在の状態: {
-                            currentWorkflowState === 'initial' ? '運転開始登録が可能です' :
-                            currentWorkflowState === 'needsMiddle' ? '中間点呼登録が必要です' :
-                            currentWorkflowState === 'needsEnd' ? '運転終了登録が可能です' :
-                            '不明な状態'
-                          }
-                        </p>
-                        <p className="text-sm">
-                          {
-                            currentWorkflowState === 'initial' ? '新しい運転を開始できます。' :
-                            currentWorkflowState === 'needsMiddle' ? '運転開始登録の降車日時が翌日以降のため、中間点呼登録が必要です。' :
-                            currentWorkflowState === 'needsEnd' ? '運転を終了してください。' :
-                            '管理者にお問い合わせください。'
-                          }
-                        </p>
+                  <div className="space-y-4 max-w-2xl mx-auto">
+                    <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">✅</span>
+                        <div>
+                          <p className="font-semibold">
+                            現在の状態: {
+                              currentWorkflowState === 'initial' ? '運転開始登録が可能です' :
+                              currentWorkflowState === 'needsMiddle' ? '中間点呼登録が必要です' :
+                              currentWorkflowState === 'needsEnd' ? '運転終了登録が可能です' :
+                              currentWorkflowState === 'waitingForNextDay' ? '今日の中間点呼登録は完了済みです' :
+                              '不明な状態'
+                            }
+                          </p>
+                          <p className="text-sm">
+                            {
+                              currentWorkflowState === 'initial' ? '新しい運転を開始できます。' :
+                              currentWorkflowState === 'needsMiddle' ? '運転開始登録の降車日時が翌日以降のため、中間点呼登録が必要です。' :
+                              currentWorkflowState === 'needsEnd' ? '運転を終了してください。' :
+                              currentWorkflowState === 'waitingForNextDay' ? '明日以降に次の中間点呼登録を行ってください。' :
+                              '管理者にお問い合わせください。'
+                            }
+                          </p>
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* Trip Progress Display */}
+                    {tripProgress && (currentWorkflowState === 'needsMiddle' || currentWorkflowState === 'needsEnd' || currentWorkflowState === 'waitingForNextDay') && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                          📊 旅程進捗状況
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="font-semibold text-gray-800">{tripProgress.totalDays}日</div>
+                            <div className="text-gray-600">総日数</div>
+                          </div>
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="font-semibold text-blue-600">{tripProgress.completedIntermediates}</div>
+                            <div className="text-gray-600">完了済み</div>
+                          </div>
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="font-semibold text-orange-600">{tripProgress.remainingIntermediates}</div>
+                            <div className="text-gray-600">残り点呼</div>
+                          </div>
+                          <div className="text-center p-2 bg-white rounded border">
+                            <div className="font-semibold text-gray-800">
+                              {tripProgress.isAlightingDay ? '最終日' : '進行中'}
+                            </div>
+                            <div className="text-gray-600">状態</div>
+                          </div>
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="mt-3">
+                          <div className="flex justify-between text-xs text-gray-600 mb-1">
+                            <span>進捗</span>
+                            <span>{tripProgress.completedIntermediates}/{tripProgress.totalIntermediatesNeeded} 完了</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                              style={{ 
+                                width: `${Math.min(100, (tripProgress.completedIntermediates / Math.max(1, tripProgress.totalIntermediatesNeeded)) * 100)}%` 
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                        
+                        {/* Special Messages */}
+                        {tripProgress?.hasIntermediateToday && !tripProgress?.isAlightingDay && (
+                          <div className="mt-2 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded">
+                            ⏰ 今日の中間点呼は完了済みです。明日以降に次の点呼を行ってください。
+                          </div>
+                        )}
+                        {tripProgress?.isAlightingDay && tripProgress?.remainingIntermediates > 0 && (
+                          <div className="mt-2 text-xs text-orange-700 bg-orange-100 px-2 py-1 rounded">
+                            🚨 最終日です！残り{tripProgress.remainingIntermediates}回の中間点呼が必要です。
+                          </div>
+                        )}
+                        {tripProgress?.isComplete && (
+                          <div className="mt-2 text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
+                            ✅ すべての中間点呼が完了しました。運転終了登録が可能です。
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
