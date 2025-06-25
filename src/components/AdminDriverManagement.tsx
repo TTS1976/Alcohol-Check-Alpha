@@ -85,13 +85,42 @@ const AdminDriverManagement: React.FC<AdminDriverManagementProps> = ({ onBack })
 
   const loadDrivers = async () => {
     try {
-      const result = await client.models.Driver.list({
-        filter: { isDeleted: { eq: false } }
-      });
-      setDrivers(result.data);
+      console.log('🔄 Loading drivers...');
+      let allDrivers: Array<Schema["Driver"]["type"]> = [];
+      let nextToken: string | undefined = undefined;
+      let pageCount = 0;
+
+      // Fetch all pages of drivers
+      do {
+        pageCount++;
+        console.log(`📄 Loading page ${pageCount}...`);
+        
+        const queryOptions: any = {
+          filter: { isDeleted: { eq: false } },
+          limit: 1000, // Maximum allowed limit
+        };
+        
+        if (nextToken) {
+          queryOptions.nextToken = nextToken;
+        }
+        
+        const result = await client.models.Driver.list(queryOptions);
+
+        allDrivers = allDrivers.concat(result.data);
+        nextToken = result.nextToken || undefined;
+        
+        console.log(`✅ Page ${pageCount}: Loaded ${result.data.length} drivers (Total so far: ${allDrivers.length})`);
+      } while (nextToken);
+
+      console.log(`🎯 Finished loading all drivers. Total: ${allDrivers.length} drivers across ${pageCount} pages`);
+      setDrivers(allDrivers);
+      
+      if (allDrivers.length > 0) {
+        setStatus(`✅ ${allDrivers.length}人のドライバーを読み込みました`);
+      }
     } catch (error) {
       console.error('Failed to load drivers:', error);
-      setStatus('ドライバー一覧の読み込みに失敗しました');
+      setStatus('ドライバー一覧の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
