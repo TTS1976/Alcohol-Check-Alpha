@@ -348,16 +348,47 @@ const AdminDriverManagement: React.FC<AdminDriverManagementProps> = ({ onBack })
         throw new Error(`行 ${i + 1}: 無効なメールアドレス形式: ${row.mail}`);
       }
 
-      // Validate date formats (MM-DD-YYYY)
-      const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
-      if (!dateRegex.test(row.birthday)) {
-        throw new Error(`行 ${i + 1}: 無効な生年月日形式 (MM-DD-YYYY): ${row.birthday}`);
-      }
-      if (!dateRegex.test(row.issueDate)) {
-        throw new Error(`行 ${i + 1}: 無効な免許証交付日形式 (MM-DD-YYYY): ${row.issueDate}`);
-      }
-      if (!dateRegex.test(row.expirationDate)) {
-        throw new Error(`行 ${i + 1}: 無効な免許証有効期限形式 (MM-DD-YYYY): ${row.expirationDate}`);
+      // Validate and normalize date formats (accepts M/D/YYYY, MM/DD/YYYY, M-D-YYYY, MM-DD-YYYY)
+      const validateAndNormalizeDate = (dateStr: string, fieldName: string, rowNum: number): string => {
+        if (!dateStr || dateStr.trim() === '') {
+          throw new Error(`行 ${rowNum}: ${fieldName}が空です`);
+        }
+
+        // Support multiple date formats: M/D/YYYY, MM/DD/YYYY, M-D-YYYY, MM-DD-YYYY
+        const dateRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/;
+        const match = dateStr.trim().match(dateRegex);
+        
+        if (!match) {
+          throw new Error(`行 ${rowNum}: 無効な${fieldName}形式。サポート形式: M/D/YYYY, MM/DD/YYYY, M-D-YYYY, MM-DD-YYYY (例: 7/1/2000, 07-01-2000): ${dateStr}`);
+        }
+
+        const [, month, day, year] = match;
+        
+        // Validate month and day ranges
+        const monthNum = parseInt(month, 10);
+        const dayNum = parseInt(day, 10);
+        
+        if (monthNum < 1 || monthNum > 12) {
+          throw new Error(`行 ${rowNum}: 無効な月 (1-12): ${month} in ${dateStr}`);
+        }
+        
+        if (dayNum < 1 || dayNum > 31) {
+          throw new Error(`行 ${rowNum}: 無効な日 (1-31): ${day} in ${dateStr}`);
+        }
+
+        // Return normalized MM-DD-YYYY format
+        const normalizedMonth = month.padStart(2, '0');
+        const normalizedDay = day.padStart(2, '0');
+        return `${normalizedMonth}-${normalizedDay}-${year}`;
+      };
+
+      // Validate and normalize all date fields
+      try {
+        row.birthday = validateAndNormalizeDate(row.birthday, '生年月日', i + 1);
+        row.issueDate = validateAndNormalizeDate(row.issueDate, '免許証交付日', i + 1);
+        row.expirationDate = validateAndNormalizeDate(row.expirationDate, '免許証有効期限', i + 1);
+      } catch (error) {
+        throw error; // Re-throw the specific validation error
       }
 
       // Validate color (1, 2, or 3)
@@ -762,16 +793,16 @@ const AdminDriverManagement: React.FC<AdminDriverManagementProps> = ({ onBack })
                   <div>• company (会社)</div>
                   <div>• employeeNo (社員番号)</div>
                   <div>• mail (メールアドレス)</div>
-                  <div>• birthday (生年月日: MM-DD-YYYY)</div>
+                  <div>• birthday (生年月日: 複数形式対応)</div>
                   <div>• phoneNumber (携帯番号)</div>
                   <div>• driversLicenseNo (免許証番号)</div>
-                  <div>• issueDate (免許証交付日: MM-DD-YYYY)</div>
-                  <div>• expirationDate (免許証有効期限: MM-DD-YYYY)</div>
+                  <div>• issueDate (免許証交付日: 複数形式対応)</div>
+                  <div>• expirationDate (免許証有効期限: 複数形式対応)</div>
                   <div>• color (免許証の色: 1=ゴールド, 2=ブルー, 3=グリーン)</div>
                 </div>
               </div>
               <div className="mt-2 text-xs text-purple-600">
-                <strong>注意:</strong> 日付は MM-DD-YYYY 形式で入力してください (例: 01-15-2024)
+                <strong>注意:</strong> 日付は複数形式に対応: M/D/YYYY, MM/DD/YYYY, M-D-YYYY, MM-DD-YYYY (例: 7/1/2000, 07-01-2000)
               </div>
             </div>
 
