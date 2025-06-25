@@ -301,7 +301,7 @@ function App({ user = null }: AppProps) {
           confirmers.push({
             id: user.manager.id, // Use Azure Object ID instead of mailNickname
             name: user.manager.displayName,
-            email: user.manager.mail,
+            email: user.manager.mail || user.manager.email,
             role: '上司',
             azureId: user.manager.id
           });
@@ -314,7 +314,7 @@ function App({ user = null }: AppProps) {
               confirmers.push({
                 id: report.id, // Use Azure Object ID instead of mailNickname
                 name: report.displayName,
-                email: report.mail,
+                email: report.mail || report.email,
                 role: `部門管理者 (${report.position || '課長レベル'})`,
                 azureId: report.id
               });
@@ -330,7 +330,7 @@ function App({ user = null }: AppProps) {
             confirmers.push({
               id: report.id, // Use Azure Object ID instead of mailNickname
               name: report.displayName,
-              email: report.mail,
+              email: report.mail || report.email,
               role: `部下 (${report.position || '一般'})`,
               azureId: report.id
             });
@@ -344,7 +344,7 @@ function App({ user = null }: AppProps) {
               confirmers.push({
                 id: member.id, // Use Azure Object ID instead of mailNickname
                 name: member.displayName,
-                email: member.mail,
+                email: member.mail || member.email,
                 role: `同部署 (${member.position || '一般'})`,
                 azureId: member.id
               });
@@ -361,7 +361,7 @@ function App({ user = null }: AppProps) {
               confirmers.push({
                 id: report.id, // Use Azure Object ID instead of mailNickname
                 name: report.displayName,
-                email: report.mail,
+                email: report.mail || report.email,
                 role: `部下 (${report.position || '一般'})`,
                 azureId: report.id
               });
@@ -858,7 +858,8 @@ function App({ user = null }: AppProps) {
         submittedAt: new Date().toISOString(),
         approvalStatus: "PENDING", // Requires confirmer approval
         confirmedBy: selectedConfirmer?.name || 'Test Confirmer',
-        confirmerId: selectedConfirmer?.id || 'test-confirmer',
+        // Store multiple possible identifiers to ensure matching works
+        confirmerId: selectedConfirmer?.azureId || selectedConfirmer?.id || 'test-confirmer',
         confirmerEmail: selectedConfirmer?.email || 'test@example.com',
         confirmerRole: selectedConfirmer?.role || 'Test Role',
         teamsNotificationSent: false,
@@ -867,6 +868,14 @@ function App({ user = null }: AppProps) {
         // Store Azure AD display name for proper @mentions
         driverDisplayName: user?.displayName || formData.driverName || 'Unknown Driver',
       };
+      
+      console.log('📋 Confirmer information stored:', {
+        confirmedBy: submissionData.confirmedBy,
+        confirmerId: submissionData.confirmerId,
+        confirmerEmail: submissionData.confirmerEmail,
+        confirmerRole: submissionData.confirmerRole,
+        selectedConfirmer: selectedConfirmer
+      });
       
       console.log('📋 Base submission data created:', submissionData);
 

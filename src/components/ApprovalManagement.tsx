@@ -53,6 +53,15 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           const pending = data.items.filter(item => 
             item && item.id && item.approvalStatus === 'PENDING'
           );
+          console.log('🔍 Loaded pending submissions:', pending.length);
+          console.log('🔍 First few submissions:', pending.slice(0, 3).map(s => ({
+            id: s.id,
+            driverName: s.driverName,
+            confirmerId: s.confirmerId,
+            confirmedBy: s.confirmedBy,
+            confirmerEmail: s.confirmerEmail,
+            submittedBy: s.submittedBy
+          })));
           setPendingSubmissions(pending);
         },
       });
@@ -104,6 +113,9 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       console.log('🔍 Filtering submissions for user:', user);
       console.log('🔍 User mailNickname:', user.mailNickname);
       console.log('🔍 User displayName:', user.displayName);
+      console.log('🔍 User id:', user.id);
+      console.log('🔍 User objectId:', user.objectId);
+      console.log('🔍 User email:', user.email);
       console.log('🔍 All pending submissions:', pendingSubmissions);
       
       if (checkUserRole('SafeDrivingManager')) {
@@ -111,24 +123,58 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         console.log('🔍 User is SafeDrivingManager - showing all submissions');
       } else {
         // For regular users, only show submissions where they are the selected confirmer
+        const originalFiltered = filtered;
         filtered = filtered.filter(submission => {
           console.log('🔍 Checking submission:', {
             id: submission.id,
             driverName: submission.driverName,
             confirmerId: submission.confirmerId,
             confirmedBy: submission.confirmedBy,
+            confirmerEmail: submission.confirmerEmail,
             submittedBy: submission.submittedBy
           });
           
-          // Check if current user is the selected confirmer
-          const isSelectedConfirmer = submission.confirmerId === user.mailNickname || 
-                                    submission.confirmedBy === user.displayName ||
-                                    submission.confirmerId === user.id ||
-                                    submission.confirmerId === user.objectId;
+          // Check if current user is the selected confirmer using multiple possible identifiers
+          const isSelectedConfirmer = 
+            submission.confirmerId === user.mailNickname || 
+            submission.confirmerId === user.id ||
+            submission.confirmerId === user.objectId ||
+            submission.confirmerId === user.email ||
+            submission.confirmerEmail === user.email ||
+            submission.confirmedBy === user.displayName ||
+            submission.confirmedBy === user.mailNickname;
           
           console.log('🔍 Is selected confirmer?', isSelectedConfirmer);
+          console.log('🔍 Match details:', {
+            'confirmerId === mailNickname': submission.confirmerId === user.mailNickname,
+            'confirmerId === id': submission.confirmerId === user.id,
+            'confirmerId === objectId': submission.confirmerId === user.objectId,
+            'confirmerId === email': submission.confirmerId === user.email,
+            'confirmerEmail === email': submission.confirmerEmail === user.email,
+            'confirmedBy === displayName': submission.confirmedBy === user.displayName,
+            'confirmedBy === mailNickname': submission.confirmedBy === user.mailNickname
+          });
+          
           return isSelectedConfirmer;
         });
+        
+        // If no submissions matched exact criteria, show a warning and log detailed info
+        if (filtered.length === 0 && originalFiltered.length > 0) {
+          console.warn('⚠️ No submissions matched user identifiers exactly. This might indicate an ID mismatch issue.');
+          console.warn('⚠️ User identifiers:', {
+            mailNickname: user.mailNickname,
+            id: user.id,
+            objectId: user.objectId,
+            email: user.email,
+            displayName: user.displayName
+          });
+          console.warn('⚠️ All pending submissions with confirmer info:', originalFiltered.map(s => ({
+            id: s.id,
+            confirmerId: s.confirmerId,
+            confirmedBy: s.confirmedBy,
+            confirmerEmail: s.confirmerEmail
+          })));
+        }
       }
     }
 
@@ -152,10 +198,14 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     }
 
     // Check if current user is the selected confirmer for this submission
-    const isSelectedConfirmer = submission.confirmerId === user.mailNickname || 
-                              submission.confirmedBy === user.displayName ||
-                              submission.confirmerId === user.id ||
-                              submission.confirmerId === user.objectId;
+    const isSelectedConfirmer = 
+      submission.confirmerId === user.mailNickname || 
+      submission.confirmerId === user.id ||
+      submission.confirmerId === user.objectId ||
+      submission.confirmerId === user.email ||
+      submission.confirmerEmail === user.email ||
+      submission.confirmedBy === user.displayName ||
+      submission.confirmedBy === user.mailNickname;
 
     if (!isSelectedConfirmer && !checkUserRole('SafeDrivingManager')) {
       alert('この申請を承認する権限がありません');
@@ -187,10 +237,14 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     }
 
     // Check if current user is the selected confirmer for this submission
-    const isSelectedConfirmer = submission.confirmerId === user.mailNickname || 
-                              submission.confirmedBy === user.displayName ||
-                              submission.confirmerId === user.id ||
-                              submission.confirmerId === user.objectId;
+    const isSelectedConfirmer = 
+      submission.confirmerId === user.mailNickname || 
+      submission.confirmerId === user.id ||
+      submission.confirmerId === user.objectId ||
+      submission.confirmerId === user.email ||
+      submission.confirmerEmail === user.email ||
+      submission.confirmedBy === user.displayName ||
+      submission.confirmedBy === user.mailNickname;
 
     if (!isSelectedConfirmer && !checkUserRole('SafeDrivingManager')) {
       alert('この申請を却下する権限がありません');
@@ -369,10 +423,14 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
                     {/* Show approve/deny buttons - if submission is shown to user, they can approve it */}
                     {(() => {
                       // Check if current user is the selected confirmer for this submission
-                      const isSelectedConfirmer = submission.confirmerId === user.mailNickname || 
-                                                submission.confirmedBy === user.displayName ||
-                                                submission.confirmerId === user.id ||
-                                                submission.confirmerId === user.objectId;
+                      const isSelectedConfirmer = 
+                        submission.confirmerId === user.mailNickname || 
+                        submission.confirmerId === user.id ||
+                        submission.confirmerId === user.objectId ||
+                        submission.confirmerId === user.email ||
+                        submission.confirmerEmail === user.email ||
+                        submission.confirmedBy === user.displayName ||
+                        submission.confirmedBy === user.mailNickname;
                       
                       const canApprove = isSelectedConfirmer || checkUserRole('SafeDrivingManager');
                       
