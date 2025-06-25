@@ -334,6 +334,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
       ctx.fill();
     });
     
+    // Draw mouth/lips
+    const mouth = landmarks.getMouth();
+    mouth.forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+    
+    // Draw jawline (lighter color)
+    ctx.fillStyle = color === '#00ff00' ? 'rgba(0, 255, 0, 0.7)' : 'rgba(255, 68, 68, 0.7)';
+    const jawline = landmarks.getJawOutline();
+    jawline.forEach(point => {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 1.5, 0, 2 * Math.PI);
+      ctx.fill();
+    });
+    
     // Draw center guidelines
     drawCenterGuidelines(ctx, ctx.canvas.width, ctx.canvas.height);
   };
