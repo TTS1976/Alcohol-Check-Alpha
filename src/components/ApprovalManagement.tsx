@@ -25,6 +25,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   const [currentPage, setCurrentPage] = useState(1);
 
   const [vehicleNames, setVehicleNames] = useState<{[key: string]: string}>({});
+  const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
   const itemsPerPage = 10;
 
 
@@ -37,10 +38,13 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     filterSubmissions();
   }, [searchTerm, pendingSubmissions, user]);
 
-  // Resolve vehicle names when submissions change
+  // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
-    if (pendingSubmissions.length > 0 && graphService) {
-      resolveVehicleNames();
+    if (pendingSubmissions.length > 0) {
+      if (graphService) {
+        resolveVehicleNames();
+      }
+      resolveDriverNames();
     }
   }, [pendingSubmissions, graphService]);
 
@@ -91,6 +95,46 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       console.log('Resolved vehicle names:', resolved);
     } catch (error) {
       console.error('Failed to resolve vehicle names:', error);
+    }
+  };
+
+  const resolveDriverNames = async () => {
+    try {
+      const driverMap: {[key: string]: string} = {};
+      
+      // Get unique driver identifiers from submissions (these are mailNicknames)
+      const uniqueDrivers = [...new Set(pendingSubmissions.map(s => s.driverName).filter(Boolean))];
+      
+      console.log('🔍 Resolving driver names for:', uniqueDrivers);
+      
+      // Load all drivers from the Driver schema
+      const result = await client.models.Driver.list({
+        filter: { isDeleted: { eq: false } }
+      });
+      
+      const drivers = result.data;
+      console.log('📋 Loaded drivers from schema:', drivers.length);
+      
+      for (const mailNickname of uniqueDrivers) {
+        // Find the driver by matching the mailNickname with the email prefix
+        const matchedDriver = drivers.find(driver => {
+          if (!driver.mail) return false;
+          const emailPrefix = driver.mail.split('@')[0].toLowerCase();
+          return emailPrefix === mailNickname.toLowerCase();
+        });
+        
+        if (matchedDriver && matchedDriver.name) {
+          driverMap[mailNickname] = matchedDriver.name;
+          console.log(`✅ Resolved ${mailNickname} -> ${matchedDriver.name}`);
+        } else {
+          console.log(`❌ Could not resolve driver name for: ${mailNickname}`);
+        }
+      }
+      
+      console.log('🎯 Final driver mapping:', driverMap);
+      setDriverNames(driverMap);
+    } catch (error) {
+      console.error('Error resolving driver names:', error);
     }
   };
 
@@ -289,6 +333,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     }
   };
 
+  // Helper function to get the resolved driver name
+  const getResolvedDriverName = (originalDriverName: string) => {
+    return driverNames[originalDriverName] || originalDriverName;
+  };
+
   // Pagination
   const totalPages = Math.ceil(filteredSubmissions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -397,7 +446,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
                     <div className="flex-1">
                       <div className="flex items-center gap-4 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {submission.driverName}
+                          {getResolvedDriverName(submission.driverName)}
                         </h3>
                         <span className="px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 border border-orange-300">
                           承認待ち
