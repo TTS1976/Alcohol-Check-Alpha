@@ -94,7 +94,13 @@ export const handler: Handler = async (event) => {
     console.log('Environment variables check:');
     console.log('TEAMS_TEAM_ID:', process.env.TEAMS_TEAM_ID ? 'SET' : 'MISSING');
     console.log('TEAMS_CHANNEL_ID:', process.env.TEAMS_CHANNEL_ID ? 'SET' : 'MISSING');
-    console.log('USER_ACCESS_TOKEN:', userAccessToken ? 'PROVIDED' : 'MISSING');
+    
+    // Validate user access token without exposing sensitive information
+    const isTokenValid = userAccessToken && 
+                        typeof userAccessToken === 'string' && 
+                        userAccessToken.length >= 10 && 
+                        userAccessToken.length <= 4096;
+    console.log('USER_ACCESS_TOKEN:', isTokenValid ? 'VALID' : 'INVALID_OR_MISSING');
     
     const requiredEnvVars = [
       'TEAMS_TEAM_ID',
@@ -117,9 +123,9 @@ export const handler: Handler = async (event) => {
     // Create approval URL
     const approvalUrl = `${process.env.APP_URL || 'http://localhost:5173'}/approve/${submissionId}`;
     
-    // Validate that we have a user access token
-    if (!userAccessToken) {
-      throw new Error('Missing user access token for delegated permissions');
+    // Validate that we have a valid user access token
+    if (!isTokenValid) {
+      throw new Error('Missing or invalid user access token for delegated permissions');
     }
 
     // Initialize Microsoft Graph client with user's access token
@@ -143,7 +149,7 @@ export const handler: Handler = async (event) => {
     console.log('Sending message to Teams via Microsoft Graph API...');
     console.log('Team ID:', process.env.TEAMS_TEAM_ID);
     console.log('Channel ID:', process.env.TEAMS_CHANNEL_ID);
-    console.log('Message payload:', JSON.stringify(teamsMessage, null, 2));
+    console.log('Teams message prepared for sending');
 
     // Send message to Teams channel with retry logic
     const response = await sendTeamsMessageWithRetry(

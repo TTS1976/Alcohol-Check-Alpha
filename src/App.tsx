@@ -196,8 +196,7 @@ function App({ user = null }: AppProps) {
                  (inputNickname && driver.mail.split('@')[0].toLowerCase() === inputNickname);
         });
 
-        console.log('Matched driver for fullAdmin check:', matchedDriver);
-        console.log('Setting userFullAdminStatus to:', matchedDriver?.fullAdmin || false);
+        console.log('Driver admin status determined');
         setUserFullAdminStatus(matchedDriver?.fullAdmin || false);
       } catch (error) {
         console.error('Failed to check user fullAdmin status:', error);
@@ -216,17 +215,7 @@ function App({ user = null }: AppProps) {
   
   // Debug logging for permissions - wrapped in useEffect to prevent infinite loops
   useEffect(() => {
-    console.log('Permission Debug:', {
-      user: user ? {
-        mailNickname: user.mailNickname,
-        role: user.role,
-        email: user.email
-      } : null,
-      userFullAdminStatus,
-      isFullAdmin,
-      isManager,
-      isAnyAdmin
-    });
+    console.log('Permission check completed');
   }, [user, userFullAdminStatus, isFullAdmin, isManager, isAnyAdmin]);
   
   // TEMPORARY: Override user role for testing - give syed00 SafeDrivingManager access
@@ -267,10 +256,10 @@ function App({ user = null }: AppProps) {
     }
 
     try {
-      console.log('Loading Azure vehicles for department:', user.department);
+      console.log('Loading Azure vehicles for user department');
       const vehicleUsers = await graphService.getVehicleUsers(user.department);
       
-      console.log('Loaded Azure vehicles:', vehicleUsers);
+      console.log('Loaded Azure vehicles successfully');
       setAzureVehicles(vehicleUsers);
     } catch (error) {
       console.error('Failed to load Azure vehicles:', error);
@@ -292,17 +281,8 @@ function App({ user = null }: AppProps) {
 
       // Get user's job level from the hierarchy system
       const userJobLevel = user.jobLevel || 1;
-      const userPosition = user.position || '一般';
       
-      console.log('Loading confirmers for user:', {
-        mailNickname: user.mailNickname,
-        jobTitle: user.jobTitle,
-        jobLevel: userJobLevel,
-        position: userPosition,
-        jobOrder: user.jobOrder,
-        department: user.department,
-        role: user.role
-      });
+      console.log('Loading confirmers for user');
 
       // For Lower-Level Employees (JobLevel < 4): Can only select higher-level confirmers
       if (userJobLevel < 4) {
@@ -406,7 +386,7 @@ function App({ user = null }: AppProps) {
 
       // Self-confirmation removed as per user request
 
-      console.log('Available confirmers loaded:', confirmers);
+      console.log('Available confirmers loaded successfully');
       setAvailableConfirmers(confirmers);
     } catch (error) {
       console.error('Failed to load available confirmers:', error);
@@ -422,7 +402,7 @@ function App({ user = null }: AppProps) {
     }
 
     try {
-      console.log('Validating driver registration for:', user.mailNickname);
+      console.log('Validating driver registration for user');
       
       // Get the logged-in user's email nickname
       const userNickname = user.mailNickname.toLowerCase();
@@ -441,7 +421,7 @@ function App({ user = null }: AppProps) {
         
         // Extract nickname from driver's email (part before @)
         const driverNickname = driver.mail.split('@')[0].toLowerCase();
-        console.log('Comparing:', userNickname, 'with', driverNickname);
+        // Driver validation in progress
         
         return driverNickname === userNickname;
       });
@@ -449,7 +429,7 @@ function App({ user = null }: AppProps) {
       if (matchedDriver) {
         setIsRegisteredDriver(true);
         setDriverValidationMessage('');
-        console.log('Driver validation successful:', matchedDriver.name);
+        console.log('Driver validation successful');
       } else {
         setIsRegisteredDriver(false);
         setDriverValidationMessage('登録されたドライバーではありません。システム管理者にお問い合わせください。');
@@ -472,11 +452,7 @@ function App({ user = null }: AppProps) {
 
     try {
       setIsWorkflowLoading(true);
-      console.log('🔍 Checking workflow state for:', user.mailNickname);
-      console.log('🔍 User object:', user);
-      console.log('🔍 User mailNickname:', user.mailNickname);
-      console.log('🔍 User email:', user.email);
-      console.log('🔍 User userPrincipalName:', user.userPrincipalName);
+      console.log('🔍 Checking workflow state for user');
       
       // First, get ALL submissions for debugging
       const allSubmissions = await client.models.AlcoholCheckSubmission.list({
@@ -485,12 +461,7 @@ function App({ user = null }: AppProps) {
         }
       });
       
-      console.log('🔍 ALL submissions for user:', allSubmissions.data);
       console.log('🔍 Total submissions found:', allSubmissions.data?.length || 0);
-      
-      // Also check what submittedBy values exist in all submissions
-      const allSubmissionsEverywhere = await client.models.AlcoholCheckSubmission.list();
-      console.log('🔍 ALL submittedBy values in database:', allSubmissionsEverywhere.data?.map(s => s.submittedBy));
       
       // Get user's most recent submissions (APPROVED, REJECTED, and PENDING)
       const result = await client.models.AlcoholCheckSubmission.list({
@@ -499,7 +470,6 @@ function App({ user = null }: AppProps) {
         }
       });
 
-      console.log('🔍 ALL submissions for user:', result.data);
       console.log('🔍 Total submissions found:', result.data?.length || 0);
 
       if (!result.data || result.data.length === 0) {
@@ -515,7 +485,7 @@ function App({ user = null }: AppProps) {
       );
 
       const latestSubmission = sortedSubmissions[0];
-      console.log('🔍 Latest submission:', latestSubmission);
+      console.log('🔍 Latest submission found');
       console.log('🔍 Registration type:', latestSubmission.registrationType);
       console.log('🔍 Approval status:', latestSubmission.approvalStatus);
 
@@ -545,7 +515,7 @@ function App({ user = null }: AppProps) {
           setTripProgress(progress);
           
           if (progress) {
-            console.log('🔍 Trip progress:', progress);
+            console.log('🔍 Trip progress calculated');
             
             if (progress.isComplete) {
               console.log('🔍 All intermediates completed, enabling end registration');
@@ -566,22 +536,24 @@ function App({ user = null }: AppProps) {
           const boardingDate = new Date(latestSubmission.boardingDateTime || '');
           const alightingDate = new Date(latestSubmission.alightingDateTime || '');
           
-          // Calculate the number of days between boarding and alighting
-          const timeDiff = alightingDate.getTime() - boardingDate.getTime();
-          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+          // Calculate the number of calendar days between boarding and alighting
+          const boardingDateOnly = new Date(boardingDate.getFullYear(), boardingDate.getMonth(), boardingDate.getDate());
+          const alightingDateOnly = new Date(alightingDate.getFullYear(), alightingDate.getMonth(), alightingDate.getDate());
+          const daysDiff = Math.ceil((alightingDateOnly.getTime() - boardingDateOnly.getTime()) / (1000 * 3600 * 24)) + 1;
           
           console.log('🔍 Trip duration analysis:');
           console.log('🔍 Boarding date:', boardingDate.toDateString());
           console.log('🔍 Alighting date:', alightingDate.toDateString());
           console.log('🔍 Days difference:', daysDiff);
           
-          // Intermediate roll calls are required for trips of 3+ days (2+ nights)
+          // Intermediate roll calls are required for trips of 2+ calendar days (1+ nights)
           // Examples:
-          // - 5/26～5/27 (1 night, 2 days): No intermediate needed
-          // - 5/26～5/28 (2 nights, 3 days): Intermediate needed
-          // - 5/26～5/30 (4 nights, 5 days): Intermediate needed
-          if (daysDiff >= 3) {
-            console.log('🔍 Trip is 3+ days (2+ nights), intermediate roll calls required');
+          // - 5/26～5/26 (same day, 1 calendar day): No intermediate needed
+          // - 5/26～5/27 (1 night, 2 calendar days): 1 intermediate needed on 27th
+          // - 5/26～5/28 (2 nights, 3 calendar days): 2 intermediates needed on 27th and 28th
+          // - 5/26～5/30 (4 nights, 5 calendar days): 4 intermediates needed on 27th, 28th, 29th, and 30th
+          if (daysDiff >= 2) {
+            console.log('🔍 Trip is 2+ calendar days (1+ nights), intermediate roll calls required');
             
             // Get trip progress for this driver
             const progress = await getTripProgress(latestSubmission.driverName || '');
@@ -595,7 +567,7 @@ function App({ user = null }: AppProps) {
               setCurrentWorkflowState('needsMiddle');
             }
           } else {
-            console.log('🔍 Trip is 1-2 days (0-1 nights), no intermediate roll calls needed');
+            console.log('🔍 Trip is 1 calendar day (same day), no intermediate roll calls needed');
             setCurrentWorkflowState('needsEnd');
           }
         } else {
@@ -607,7 +579,7 @@ function App({ user = null }: AppProps) {
         setCurrentWorkflowState('initial');
       }
 
-      console.log('🔍 Final workflow state set to:', currentWorkflowState);
+      console.log('🔍 Workflow state determined');
       setIsWorkflowLoading(false);
     } catch (error) {
       console.error('🔍 Error checking workflow state:', error);
@@ -647,12 +619,7 @@ function App({ user = null }: AppProps) {
                         user.displayName?.replace(/\s+/g, '.').toLowerCase() ||
                         'unknown-user';
       
-      console.log('Auto-setting driver name from user data:', {
-        mailNickname: user.mailNickname,
-        email: user.email,
-        userPrincipalName: user.userPrincipalName,
-        finalDriverName: driverName
-      });
+      console.log('Auto-setting driver name from user data - driver set successfully');
       
       setFormData(prev => ({ 
         ...prev, 
@@ -692,8 +659,11 @@ function App({ user = null }: AppProps) {
       const alightingDate = new Date(latestStart.alightingDateTime || '');
       const currentDate = new Date();
 
-      // Calculate total trip duration
-      const totalDays = Math.ceil((alightingDate.getTime() - boardingDate.getTime()) / (1000 * 3600 * 24));
+      // Calculate total trip duration (count calendar days, not time difference)
+      // For 5/26～5/28: boarding=26th, alighting=28th → 3 calendar days (26,27,28)
+      const boardingDateOnly = new Date(boardingDate.getFullYear(), boardingDate.getMonth(), boardingDate.getDate());
+      const alightingDateOnly = new Date(alightingDate.getFullYear(), alightingDate.getMonth(), alightingDate.getDate());
+      const totalDays = Math.ceil((alightingDateOnly.getTime() - boardingDateOnly.getTime()) / (1000 * 3600 * 24)) + 1;
       const totalIntermediatesNeeded = totalDays - 1; // One intermediate for each day except start day
 
       // Get all intermediate submissions for this trip
@@ -745,7 +715,7 @@ function App({ user = null }: AppProps) {
   // Load confirmers when user changes (removed driver name dependency to prevent infinite loop)
   useEffect(() => {
     if (user) {
-      console.log('User available, loading confirmers for:', user.mailNickname || user.email);
+      console.log('User available, loading confirmers');
       loadAvailableConfirmers();
     }
   }, [user, loadAvailableConfirmers]);
@@ -802,7 +772,13 @@ function App({ user = null }: AppProps) {
       let userAccessToken: string | null = null;
       try {
         userAccessToken = await graphService.getAccessToken();
-        console.log('✅ Successfully obtained Microsoft Graph access token');
+        
+        // Validate token without exposing sensitive information
+        if (!userAccessToken || userAccessToken.length < 10) {
+          throw new Error('Invalid access token received');
+        }
+        
+        console.log('✅ Successfully obtained and validated Microsoft Graph access token');
       } catch (tokenError) {
         console.error('Failed to get Microsoft Graph access token:', tokenError);
         console.warn('Teams notification will not be sent due to missing access token');
@@ -839,20 +815,7 @@ function App({ user = null }: AppProps) {
       });
 
       console.log('Invoking Teams notification Lambda function...');
-      console.log('Payload being sent:', {
-        submissionId,
-        content: notificationContent,
-        submittedBy: user?.mailNickname || user?.email || user?.userPrincipalName || driverName,
-        confirmerName,
-        supervisorDisplayName: selectedConfirmer?.name || confirmerName,
-        supervisorEmail: selectedConfirmer?.email,
-        supervisorObjectId: selectedConfirmer?.azureId,
-        driverDisplayName: user?.displayName || driverName,
-        driverEmail: user?.email || user?.userPrincipalName,
-        driverObjectId: user?.id || user?.objectId,
-        userAccessToken: userAccessToken ? 'PROVIDED' : 'MISSING',
-        accessTokenLength: userAccessToken ? userAccessToken.length : 0
-      });
+      console.log('Teams notification payload prepared');
       
       const response = await lambdaClient.send(command);
       
@@ -863,9 +826,8 @@ function App({ user = null }: AppProps) {
         // Check the response payload for any errors
         if (response.Payload) {
           const result = JSON.parse(new TextDecoder().decode(response.Payload));
-          console.log('Lambda response body:', result);
           if (result.statusCode !== 200) {
-            console.error('Lambda returned error:', result);
+            console.error('Lambda returned error - check CloudWatch logs for details');
           } else {
             console.log('✅ Teams notification sent successfully!');
           }
@@ -2249,9 +2211,15 @@ function App({ user = null }: AppProps) {
                     📸 写真撮影 <span className="text-red-500">*</span>
                   </h3>
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-amber-800 text-sm font-medium">
-                    ⚠️「アルコールチェッカーの測定画面とご自身の顔が一緒に映るように写真を撮ってください。」
-                    </p>
+                  <p className="text-sm font-medium">
+                    ⚠️「
+                    <span className="text-red-600">アルコールチェッカーの測定画面</span>
+                    と
+                    <span className="text-red-600">ご自身の顔</span>
+                    が
+                    <span className="text-red-600">一緒に映るように</span>
+                    写真を撮ってください。」
+                  </p>
                   </div>
                   <div className="bg-white rounded-xl p-4 border border-gray-200">
                     <CameraCapture onImageSend={handleImageSend} autoOpen={true} />

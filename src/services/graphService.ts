@@ -40,9 +40,7 @@ export class GraphService {
         .select('id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,mobilePhone,businessPhones,officeLocation,employeeId,mailNickname')
         .get();
       
-      console.log('Raw user data from Graph API:', user);
-      console.log('MailNickname from API:', user.mailNickname);
-      console.log('UserPrincipalName from API:', user.userPrincipalName);
+              console.log('Successfully retrieved user data from Graph API');
       
       return {
         id: user.id,
@@ -138,7 +136,7 @@ export class GraphService {
   async checkSafeDrivingManagerRole(userId: string): Promise<boolean> {
     // TODO: Implement database call to check SafeDrivingManager role
     // For now, return false. You'll need to implement this based on your database
-    console.log('Checking SafeDrivingManager role for user:', userId);
+    console.log('Checking SafeDrivingManager role for user');
     return false;
   }
 
@@ -168,7 +166,7 @@ export class GraphService {
       
       // Get user profile
       const userProfile = await this.getUserProfile();
-      console.log('User profile fetched:', userProfile);
+      console.log('User profile fetched successfully');
       
       // Get manager and direct reports
       const [manager, directReports] = await Promise.all([
@@ -218,15 +216,7 @@ export class GraphService {
         sessionId: account.homeAccountId,
       };
 
-      console.log('App user built successfully:', {
-        displayName: result.displayName,
-        jobTitle: result.jobTitle,
-        jobLevel: result.jobLevel,
-        jobOrder: result.jobOrder,
-        position: result.position,
-        role: result.role,
-        isSafeDrivingManager: result.isSafeDrivingManager
-      });
+      console.log('App user built successfully');
 
       return result;
     } catch (error) {
@@ -280,7 +270,7 @@ export class GraphService {
         return [];
       }
 
-      console.log('Fetching vehicles with prefix:', vehiclePrefix, 'for department:', userDepartment);
+      console.log('Fetching vehicles with department-specific prefix');
 
       // Query Azure AD users whose displayName starts with the vehicle prefix
       const response = await this.graphClient
@@ -299,7 +289,7 @@ export class GraphService {
         };
       });
 
-      console.log(`Found ${vehicleUsers.length} vehicle users for department ${userDepartment}:`, vehicleUsers);
+      console.log(`Found ${vehicleUsers.length} vehicle users for department`);
       return vehicleUsers;
 
     } catch (error) {
