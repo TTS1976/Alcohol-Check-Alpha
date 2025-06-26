@@ -115,7 +115,13 @@ export const handler: Handler = async (event) => {
     }
     
     const accessToken = tokenResponse.token!;
-    console.log('Access token obtained successfully');
+    
+    // Validate token without exposing sensitive information
+    if (!accessToken || accessToken.length < 10 || accessToken.length > 1024) {
+      throw new Error('Invalid access token format received from DirectCloud');
+    }
+    
+    console.log('Access token obtained and validated successfully');
     
     // Step 2: Upload file to DirectCloud with retry logic
     console.log('Uploading file to DirectCloud...');
@@ -257,13 +263,7 @@ async function getAccessToken(): Promise<{ success: boolean; token?: string; err
     formData.append('password', process.env.DIRECTCLOUD_PASSWORD!);
     
     console.log('Auth request to:', `${process.env.DIRECTCLOUD_BASE_URL}/openapi/jauth/token`);
-    console.log('Auth payload:', {
-      service: process.env.DIRECTCLOUD_SERVICE,
-      service_key: '[HIDDEN]',
-      code: process.env.DIRECTCLOUD_CODE,
-      id: process.env.DIRECTCLOUD_ID,
-      password: '[HIDDEN]'
-    });
+    console.log('Auth payload prepared with service credentials');
     
     const response = await fetch(`${process.env.DIRECTCLOUD_BASE_URL}/openapi/jauth/token`, {
       method: 'POST',
@@ -275,7 +275,12 @@ async function getAccessToken(): Promise<{ success: boolean; token?: string; err
     
     console.log('Auth response status:', response.status);
     const responseText = await response.text();
-    console.log('Auth response text:', responseText);
+    
+    if (!response.ok) {
+      console.log('Auth failed with response:', responseText);
+    } else {
+      console.log('Auth response received successfully');
+    }
     
     if (!response.ok) {
       return { success: false, error: `Auth failed: ${response.status} - ${responseText}` };
@@ -349,7 +354,7 @@ async function uploadToDirectCloud(accessToken: string, fileName: string, fileDa
     console.log('- URL:', `${process.env.DIRECTCLOUD_BASE_URL}/openapi/v2/files/upload/sync`);
     console.log('- Content-Type:', `multipart/form-data; boundary=${boundary}`);
     console.log('- Content-Length:', totalBody.length);
-    console.log('- Access token length:', accessToken.length);
+    console.log('- Access token: VALIDATED');
     
     const response = await fetch(`${process.env.DIRECTCLOUD_BASE_URL}/openapi/v2/files/upload/sync`, {
       method: 'POST',
@@ -363,7 +368,12 @@ async function uploadToDirectCloud(accessToken: string, fileName: string, fileDa
     
     console.log('Upload response status:', response.status);
     const responseText = await response.text();
-    console.log('Upload response text:', responseText);
+    
+    if (!response.ok) {
+      console.log('Upload failed with response:', responseText);
+    } else {
+      console.log('Upload response received successfully');
+    }
     
     if (!response.ok) {
       // Check if this is a retryable HTTP status

@@ -96,24 +96,13 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
   const createSubmissionGroups = () => {
     console.log('🔗 Creating submission groups from:', allSubmissions.length, 'submissions');
     
-    // Debug: Log all submissions with their relationships
-    allSubmissions.forEach(sub => {
-      console.log('📋 Submission:', {
-        id: sub.id,
-        type: sub.registrationType,
-        driver: sub.driverName,
-        relatedId: sub.relatedSubmissionId,
-        status: sub.approvalStatus,
-        submittedAt: sub.submittedAt
-      });
-    });
+    // Process submissions and their relationships
     
     const groups = new Map<string, SubmissionGroup>();
     
     // First, find all start submissions and create groups
     allSubmissions.forEach(submission => {
       if (submission.registrationType === '運転開始登録') {
-        console.log('🚗 Creating group for start submission:', submission.id);
         groups.set(submission.id, {
           id: submission.id,
           startSubmission: submission,
@@ -132,24 +121,15 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
     // Then, add middle and end submissions to their respective groups
     allSubmissions.forEach(submission => {
       if (submission.registrationType === '中間点呼登録' && submission.relatedSubmissionId) {
-        console.log('⏸️ Processing middle submission:', submission.id, 'looking for group:', submission.relatedSubmissionId);
         const group = groups.get(submission.relatedSubmissionId);
         if (group) {
-          console.log('✅ Found group for middle submission, adding to group');
           group.middleSubmissions.push(submission);
-        } else {
-          console.log('❌ No group found for middle submission');
         }
       } else if (submission.registrationType === '運転終了登録' && submission.relatedSubmissionId) {
-        console.log('🏁 Processing end submission:', submission.id, 'looking for group:', submission.relatedSubmissionId);
         const group = groups.get(submission.relatedSubmissionId);
         if (group) {
-          console.log('✅ Found group for end submission, adding to group');
           group.endSubmission = submission;
           group.isComplete = true;
-        } else {
-          console.log('❌ No group found for end submission');
-          console.log('🔍 Available group IDs:', Array.from(groups.keys()));
         }
       }
     });
@@ -235,15 +215,6 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
     }
 
     console.log('🎯 Final groups created:', groups.size);
-    groups.forEach((group, id) => {
-      console.log(`📦 Group ${id}:`, {
-        driver: group.driverName,
-        hasStart: !!group.startSubmission,
-        middleCount: group.middleSubmissions.length,
-        hasEnd: !!group.endSubmission,
-        isComplete: group.isComplete
-      });
-    });
     
     setSubmissionGroups(Array.from(groups.values()));
     setFilteredGroups(groupsArray);
@@ -285,11 +256,11 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
       if (vehicleIds.length === 0) return;
 
-      console.log('Resolving vehicle names for IDs:', vehicleIds);
+      console.log('Resolving vehicle names for', vehicleIds.length, 'vehicles');
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
       
       setVehicleNames(prev => ({ ...prev, ...resolved }));
-      console.log('Resolved vehicle names:', resolved);
+      console.log('Resolved', Object.keys(resolved).length, 'vehicle names');
     } catch (error) {
       console.error('Failed to resolve vehicle names:', error);
     }
@@ -302,7 +273,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
       // Get unique driver identifiers from submissions (these are mailNicknames)
       const uniqueDrivers = [...new Set(allSubmissions.map(s => s.driverName).filter(Boolean))];
       
-      console.log('🔍 Resolving driver names for:', uniqueDrivers);
+      console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
       
       // Load all drivers from the Driver schema
       const result = await client.models.Driver.list({
@@ -322,13 +293,13 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
         
         if (matchedDriver && matchedDriver.name) {
           driverMap[mailNickname] = matchedDriver.name;
-          console.log(`✅ Resolved ${mailNickname} -> ${matchedDriver.name}`);
+          console.log(`✅ Resolved driver name successfully`);
         } else {
-          console.log(`❌ Could not resolve driver name for: ${mailNickname}`);
+                      console.log(`❌ Could not resolve driver name`);
         }
       }
       
-      console.log('🎯 Final driver mapping:', driverMap);
+      console.log('🎯 Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
       setDriverNames(driverMap);
     } catch (error) {
       console.error('Error resolving driver names:', error);

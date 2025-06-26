@@ -58,14 +58,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
             item && item.id && item.approvalStatus === 'PENDING'
           );
           console.log('🔍 Loaded pending submissions:', pending.length);
-          console.log('🔍 First few submissions:', pending.slice(0, 3).map(s => ({
-            id: s.id,
-            driverName: s.driverName,
-            confirmerId: s.confirmerId,
-            confirmedBy: s.confirmedBy,
-            confirmerEmail: s.confirmerEmail,
-            submittedBy: s.submittedBy
-          })));
+          console.log('🔍 Loaded submission details for processing');
           setPendingSubmissions(pending);
         },
       });
@@ -88,11 +81,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
       if (vehicleIds.length === 0) return;
 
-      console.log('Resolving vehicle names for IDs:', vehicleIds);
+      console.log('Resolving vehicle names for', vehicleIds.length, 'vehicles');
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
       
       setVehicleNames(prev => ({ ...prev, ...resolved }));
-      console.log('Resolved vehicle names:', resolved);
+      console.log('Resolved', Object.keys(resolved).length, 'vehicle names');
     } catch (error) {
       console.error('Failed to resolve vehicle names:', error);
     }
@@ -105,7 +98,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       // Get unique driver identifiers from submissions (these are mailNicknames)
       const uniqueDrivers = [...new Set(pendingSubmissions.map(s => s.driverName).filter(Boolean))];
       
-      console.log('🔍 Resolving driver names for:', uniqueDrivers);
+      console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
       
       // Load all drivers from the Driver schema
       const result = await client.models.Driver.list({
@@ -125,13 +118,13 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         
         if (matchedDriver && matchedDriver.name) {
           driverMap[mailNickname] = matchedDriver.name;
-          console.log(`✅ Resolved ${mailNickname} -> ${matchedDriver.name}`);
+          console.log(`✅ Resolved driver name successfully`);
         } else {
-          console.log(`❌ Could not resolve driver name for: ${mailNickname}`);
+                      console.log(`❌ Could not resolve driver name`);
         }
       }
       
-      console.log('🎯 Final driver mapping:', driverMap);
+      console.log('🎯 Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
       setDriverNames(driverMap);
     } catch (error) {
       console.error('Error resolving driver names:', error);
@@ -154,13 +147,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     // Apply role-based filtering - show only submissions where current user is the selected confirmer
     if (user) {
-      console.log('🔍 Filtering submissions for user:', user);
-      console.log('🔍 User mailNickname:', user.mailNickname);
-      console.log('🔍 User displayName:', user.displayName);
-      console.log('🔍 User id:', user.id);
-      console.log('🔍 User objectId:', user.objectId);
-      console.log('🔍 User email:', user.email);
-      console.log('🔍 All pending submissions:', pendingSubmissions);
+      console.log('🔍 Filtering submissions for user');
+      console.log('🔍 Checking user permissions');
       
       if (checkUserRole('SafeDrivingManager')) {
         // SafeDrivingManager can see all submissions
@@ -169,15 +157,6 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         // For regular users, only show submissions where they are the selected confirmer
         const originalFiltered = filtered;
         filtered = filtered.filter(submission => {
-          console.log('🔍 Checking submission:', {
-            id: submission.id,
-            driverName: submission.driverName,
-            confirmerId: submission.confirmerId,
-            confirmedBy: submission.confirmedBy,
-            confirmerEmail: submission.confirmerEmail,
-            submittedBy: submission.submittedBy
-          });
-          
           // Check if current user is the selected confirmer using multiple possible identifiers
           const isSelectedConfirmer = 
             submission.confirmerId === user.mailNickname || 
@@ -188,41 +167,17 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
             submission.confirmedBy === user.displayName ||
             submission.confirmedBy === user.mailNickname;
           
-          console.log('🔍 Is selected confirmer?', isSelectedConfirmer);
-          console.log('🔍 Match details:', {
-            'confirmerId === mailNickname': submission.confirmerId === user.mailNickname,
-            'confirmerId === id': submission.confirmerId === user.id,
-            'confirmerId === objectId': submission.confirmerId === user.objectId,
-            'confirmerId === email': submission.confirmerId === user.email,
-            'confirmerEmail === email': submission.confirmerEmail === user.email,
-            'confirmedBy === displayName': submission.confirmedBy === user.displayName,
-            'confirmedBy === mailNickname': submission.confirmedBy === user.mailNickname
-          });
-          
           return isSelectedConfirmer;
         });
         
-        // If no submissions matched exact criteria, show a warning and log detailed info
+        // If no submissions matched exact criteria, show a warning
         if (filtered.length === 0 && originalFiltered.length > 0) {
           console.warn('⚠️ No submissions matched user identifiers exactly. This might indicate an ID mismatch issue.');
-          console.warn('⚠️ User identifiers:', {
-            mailNickname: user.mailNickname,
-            id: user.id,
-            objectId: user.objectId,
-            email: user.email,
-            displayName: user.displayName
-          });
-          console.warn('⚠️ All pending submissions with confirmer info:', originalFiltered.map(s => ({
-            id: s.id,
-            confirmerId: s.confirmerId,
-            confirmedBy: s.confirmedBy,
-            confirmerEmail: s.confirmerEmail
-          })));
         }
       }
     }
 
-    console.log('🔍 Filtered submissions:', filtered);
+    console.log('🔍 Filtered submissions count:', filtered.length);
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
   };

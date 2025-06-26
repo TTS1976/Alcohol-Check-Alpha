@@ -44,7 +44,7 @@ const AppWrapper: React.FC = () => {
       directReports: user.directReports,
     };
     
-    console.log('Transformed user data being passed to App:', transformedUser);
+    console.log('User data transformed and ready for App component');
     
     return <App user={transformedUser} />;
   }

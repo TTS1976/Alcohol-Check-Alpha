@@ -18,21 +18,21 @@ export const msalConfig: Configuration = {
         if (containsPii) {
           return;
         }
+        // Only log errors and warnings to reduce sensitive information exposure
         switch (level) {
           case LogLevel.Error:
             console.error(message);
             return;
-          case LogLevel.Info:
-            console.info(message);
-            return;
-          case LogLevel.Verbose:
-            console.debug(message);
-            return;
           case LogLevel.Warning:
             console.warn(message);
             return;
+          case LogLevel.Info:
+          case LogLevel.Verbose:
+            // Suppress info and verbose logs to prevent token information exposure
+            return;
         }
       },
+      logLevel: LogLevel.Warning, // Set minimum log level to Warning
     },
   },
 };

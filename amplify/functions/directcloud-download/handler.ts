@@ -94,7 +94,13 @@ export const handler: Handler = async (event) => {
     }
     
     const accessToken = tokenResponse.token!;
-    console.log('Access token obtained successfully');
+    
+    // Validate token without exposing sensitive information
+    if (!accessToken || accessToken.length < 10 || accessToken.length > 1024) {
+      throw new Error('Invalid access token format received from DirectCloud');
+    }
+    
+    console.log('Access token obtained and validated successfully');
     
     // Step 2: Find the file in DirectCloud with retry logic
     console.log('Searching for file in DirectCloud...');
@@ -277,6 +283,7 @@ async function getAccessToken(): Promise<{ success: boolean; token?: string; err
     formData.append('password', process.env.DIRECTCLOUD_PASSWORD!);
     
     console.log('Auth request to:', `${process.env.DIRECTCLOUD_BASE_URL}/openapi/jauth/token`);
+    console.log('Auth payload prepared with service credentials');
     
     const response = await fetch(`${process.env.DIRECTCLOUD_BASE_URL}/openapi/jauth/token`, {
       method: 'POST',
@@ -288,7 +295,12 @@ async function getAccessToken(): Promise<{ success: boolean; token?: string; err
     
     console.log('Auth response status:', response.status);
     const responseText = await response.text();
-    console.log('Auth response text:', responseText);
+    
+    if (!response.ok) {
+      console.log('Auth failed with response:', responseText);
+    } else {
+      console.log('Auth response received successfully');
+    }
     
     if (!response.ok) {
       return { success: false, error: `Auth failed: ${response.status} - ${responseText}` };
@@ -330,7 +342,7 @@ async function findFileByName(accessToken: string, fileName: string): Promise<an
     console.log('Request details:');
     console.log('- URL:', `${process.env.DIRECTCLOUD_BASE_URL}/openapi/v2/folders/lists?node=${encodeURIComponent(process.env.DIRECTCLOUD_UPLOAD_FOLDER!)}&offset=0&limit=1000`);
     console.log('- Method: GET');
-    console.log('- Headers: access_token, lang');
+    console.log('- Headers: access_token (validated), lang');
     console.log('- Folder node:', process.env.DIRECTCLOUD_UPLOAD_FOLDER);
     
     if (response.ok) {

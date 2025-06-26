@@ -121,12 +121,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('Found cached account:', account.username);
       msalInstance.setActiveAccount(account);
 
-      // Test if tokens are still valid by trying to get an access token
-      try {
-        await getAccessToken();
-        console.log('Tokens are valid, building user profile');
-      } catch (tokenError) {
-        console.log('Tokens expired or invalid, clearing cache');
+          // Test if tokens are still valid by trying to get an access token
+    try {
+      const token = await getAccessToken();
+      if (!token || token.length < 10) {
+        throw new Error('Invalid token format');
+      }
+      console.log('Tokens are valid, building user profile');
+    } catch (tokenError) {
+      console.log('Tokens expired or invalid, clearing cache');
         await msalInstance.clearCache();
         setAuthState({
           isAuthenticated: false,
@@ -151,7 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       setGraphService(tempGraphService);
-      console.log('User authenticated successfully:', appUser.displayName);
+              console.log('User authenticated successfully');
     } catch (error) {
       console.error('Auth state check failed:', error);
       // Clear cache if there's an error

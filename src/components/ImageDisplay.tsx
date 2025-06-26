@@ -72,19 +72,17 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ fileName }) => {
 
       console.log('Invoking DirectCloud download Lambda function...');
       const response = await lambdaClient.send(command);
-      console.log('Lambda response:', response);
+      console.log('Lambda response status:', response.StatusCode);
 
       if (response.StatusCode === 200 && response.Payload) {
         const payload = JSON.parse(new TextDecoder().decode(response.Payload));
-        console.log('Raw payload:', payload);
         
         // Parse the stringified body - THIS IS THE KEY FIX
         const body = JSON.parse(payload.body);
-        console.log('Parsed body:', body);
 
         if (body.success && body.data) {
           const imageUrl = `data:${body.contentType || 'image/jpeg'};base64,${body.data}`;
-          console.log('Constructed image URL:', imageUrl.slice(0, 100) + '...'); // Log partial URL
+          console.log('Image data loaded successfully');
           setImageData(imageUrl);
         } else {
           setError(body.error || 'No image data received');

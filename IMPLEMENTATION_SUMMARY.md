@@ -31,11 +31,20 @@ I've successfully created two new Lambda functions for auto-triggered Teams noti
 The system now implements a more sophisticated workflow for multi-day trips:
 
 **Trip Duration Requirements:**
-- **1-2 Days (0-1 nights)**: No intermediate roll calls needed
-  - Example: `5/26～5/27` → 運転開始 → 運転終了
+- **1 Calendar Day (same day)**: No intermediate roll calls needed
+  - Example: `5/26～5/26` → 運転開始 → 運転終了
   
-- **3+ Days (2+ nights)**: Intermediate roll calls required for each day, INCLUDING the final day
-  - Example: `5/26～5/30` → 
+- **2+ Calendar Days (1+ nights)**: Intermediate roll calls required for each day except the start day, INCLUDING the final day
+  - Example: `5/26～5/27` (1 night, 2 calendar days) → 
+    - `5/26`: 運転開始
+    - `5/27`: 中間点呼登録 (Final day - **REQUIRED**)
+    - `5/27`: 運転終了登録 (Only available after final day intermediate)
+  - Example: `5/26～5/28` (2 nights, 3 calendar days) → 
+    - `5/26`: 運転開始
+    - `5/27`: 中間点呼登録 (Day 2)
+    - `5/28`: 中間点呼登録 (Final day - **REQUIRED**)
+    - `5/28`: 運転終了登録 (Only available after final day intermediate)
+  - Example: `5/26～5/30` (4 nights, 5 calendar days) → 
     - `5/26`: 運転開始
     - `5/27`: 中間点呼登録 (Day 2)
     - `5/28`: 中間点呼登録 (Day 3) 
@@ -45,8 +54,8 @@ The system now implements a more sophisticated workflow for multi-day trips:
 
 **Workflow State Logic:**
 1. **After 運転開始登録**: Check trip duration
-   - 1-2 days → Enable 運転終了登録
-   - 3+ days → Enable 中間点呼登録
+   - 1 calendar day → Enable 運転終了登録
+   - 2+ calendar days → Enable 中間点呼登録
 
 2. **After each 中間点呼登録**: Check if current date matches alighting date
    - **Not final day** → Enable another 中間点呼登録

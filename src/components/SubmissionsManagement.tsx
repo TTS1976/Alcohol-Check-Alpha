@@ -74,11 +74,11 @@ const SubmissionsManagement: React.FC<SubmissionsManagementProps> = ({
 
       if (vehicleIds.length === 0) return;
 
-      console.log('Resolving vehicle names for IDs:', vehicleIds);
+      console.log('Resolving vehicle names for', vehicleIds.length, 'vehicles');
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
       
       setVehicleNames(prev => ({ ...prev, ...resolved }));
-      console.log('Resolved vehicle names:', resolved);
+      console.log('Resolved', Object.keys(resolved).length, 'vehicle names');
     } catch (error) {
       console.error('Failed to resolve vehicle names:', error);
     }

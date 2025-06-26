@@ -92,11 +92,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
       if (detection) {
         const orientation = analyzeStrictFaceOrientation(detection, video.videoWidth, video.videoHeight);
         
-        console.log('Face analysis result:', {
-          isFacingForward: orientation.isFacingForward,
-          confidence: Math.round(orientation.confidence * 100),
-          message: orientation.message
-        });
+        console.log('Face analysis completed:', orientation.isFacingForward ? 'Forward facing' : 'Not forward facing');
         
         return orientation.isFacingForward;
       } else {
@@ -213,7 +209,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     } else if (!isNoseCentered) {
       message = 'もう少し正面を向いてください';
     } else {
-      message = '✓ 正面を向いています - 撮影可能です';
+      message = '正面を向いています - 撮影可能です';
     }
     
     return {
@@ -570,9 +566,9 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
                   {faceOrientation.message}
                 </span>
               </div>
-              <div className="status-details">
+              {/* <div className="status-details">
                 信頼度: {Math.round(faceOrientation.confidence * 100)}% (Face-api.js)
-              </div>
+              </div> */}
             </div>
           )}
           
