@@ -133,7 +133,7 @@ export class GraphService {
   }
 
   // Check if user has SafeDrivingManager role (this would be stored in your database)
-  async checkSafeDrivingManagerRole(userId: string): Promise<boolean> {
+  async checkSafeDrivingManagerRole(_userId: string): Promise<boolean> {
     // TODO: Implement database call to check SafeDrivingManager role
     // For now, return false. You'll need to implement this based on your database
     console.log('Checking SafeDrivingManager role for user');
