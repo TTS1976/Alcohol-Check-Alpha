@@ -16,6 +16,7 @@ import SubmissionsManagement from './components/SubmissionsManagement';
 import SafetyManagement from './components/SafetyManagement';
 // import AdminVehicleManagement from './components/AdminVehicleManagement'; // Removed since using Azure AD
 import ApprovalManagement from './components/ApprovalManagement';
+import TempCSVUpload from './components/TempCSVUpload';
 import teralSafetyIcon from './assets/teralsafety.png';
 import './App.css';
 
@@ -65,7 +66,7 @@ interface AppProps {
 function App({ user = null }: AppProps) {
   const { graphService, logout } = useAuth();
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'main' | 'admin' | 'vehicles' | 'submissions' | 'safety' | 'approvals'>('main');
+  const [currentView, setCurrentView] = useState<'main' | 'admin' | 'vehicles' | 'submissions' | 'safety' | 'approvals' | 'tempcsv'>('main');
   const [registrationType, setRegistrationType] = useState<'start' | 'middle' | 'end' | null>(null);
   const [showForm, setShowForm] = useState(false);
   
@@ -1259,6 +1260,19 @@ function App({ user = null }: AppProps) {
       isInspectionResultValid(formData.inspectionResult) &&
       isImageUploaded;
 
+  // Disable picture requirement
+  // const isFormValid = (registrationType === 'end' || registrationType === 'middle')
+  // ? formData.inspectionResultEnd.trim() !== '' &&
+  //   formData.selectedConfirmer.trim() !== '' &&
+  //   isInspectionResultValid(formData.inspectionResultEnd)
+  //   // && isImageUploaded  // DISABLED FOR TESTING
+  // : isVehicleFormValid &&
+  //   isSafetyFormValid &&
+  //   formData.inspectionResult.trim() !== '' &&
+  //   formData.selectedConfirmer.trim() !== '' &&
+  //   isInspectionResultValid(formData.inspectionResult);
+  //   // && isImageUploaded;  // DISABLED FOR TESTING
+
   // Add function to check if expiration date is within 3 months
   const isExpirationSoon = (expirationDate: string): boolean => {
     const expDate = new Date(expirationDate);
@@ -1407,6 +1421,14 @@ function App({ user = null }: AppProps) {
                     >
                       <span className="flex items-center gap-2">
                         👤 ドライバー管理
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setCurrentView('tempcsv')}
+                      className="group px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 text-sm font-medium transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+                    >
+                      <span className="flex items-center gap-2">
+                        🚨 一時CSV移行
                       </span>
                     </button>
                     {/* Vehicle management button - Removed since using Azure AD */}
@@ -2344,6 +2366,24 @@ function App({ user = null }: AppProps) {
       <div>
         <AdminDriverManagement onBack={() => setCurrentView('main')} user={user} />
         {/* Sign Out Button for Admin View */}
+        <div className="fixed bottom-4 right-4">
+          <button 
+            onClick={signOut}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow-lg"
+          >
+            サインアウト
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Render temporary CSV upload view if requested (ADMIN ONLY)
+  if (currentView === 'tempcsv' && isFullAdmin) {
+    return (
+      <div>
+        <TempCSVUpload onBack={() => setCurrentView('main')} />
+        {/* Sign Out Button for CSV Upload View */}
         <div className="fixed bottom-4 right-4">
           <button 
             onClick={signOut}
