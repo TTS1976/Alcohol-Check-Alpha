@@ -220,6 +220,9 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         approvedAt: new Date().toISOString(),
       });
       
+      // Remove the approved submission from local state to update UI immediately
+      setPendingSubmissions(prev => prev.filter(sub => sub.id !== submissionId));
+      
       setStatus(`申請 ${submissionId} を承認しました`);
       setTimeout(() => setStatus(''), 3000);
     } catch (error) {
@@ -262,6 +265,9 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         approvedAt: new Date().toISOString(),
         // rejectionReason: reason, // TODO: Add rejectionReason to schema
       });
+      
+      // Remove the rejected submission from local state to update UI immediately
+      setPendingSubmissions(prev => prev.filter(sub => sub.id !== submissionId));
       
       setStatus(`申請 ${submissionId} を却下しました`);
       setTimeout(() => setStatus(''), 3000);

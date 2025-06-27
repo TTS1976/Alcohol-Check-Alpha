@@ -17,6 +17,7 @@ import SafetyManagement from './components/SafetyManagement';
 // import AdminVehicleManagement from './components/AdminVehicleManagement'; // Removed since using Azure AD
 import ApprovalManagement from './components/ApprovalManagement';
 import TempCSVUpload from './components/TempCSVUpload';
+import ManualRegistrationForm from './components/ManualRegistrationForm';
 import teralSafetyIcon from './assets/teralsafety.png';
 import './App.css';
 
@@ -70,8 +71,9 @@ function App({ user = null }: AppProps) {
   const { graphService, logout } = useAuth();
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'main' | 'admin' | 'vehicles' | 'submissions' | 'safety' | 'approvals' | 'tempcsv'>('main');
-  const [registrationType, setRegistrationType] = useState<'start' | 'middle' | 'end' | null>(null);
+  const [registrationType, setRegistrationType] = useState<'start' | 'middle' | 'end' | 'manual' | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
   
   // Azure AD sign out functionality
   const signOut = async () => {
@@ -431,7 +433,7 @@ function App({ user = null }: AppProps) {
         console.log('Driver validation successful');
       } else {
         setIsRegisteredDriver(false);
-        setDriverValidationMessage('登録されたドライバーではありません。システム管理者にお問い合わせください。');
+        setDriverValidationMessage('登録されたドライバーではありません。情報システム部にお問い合わせください。');
         console.log('Driver validation failed: No matching driver found');
       }
     } catch (error) {
@@ -535,14 +537,14 @@ function App({ user = null }: AppProps) {
           console.log('🔍 Alighting date:', alightingDate.toDateString());
           console.log('🔍 Days difference:', daysDiff);
           
-          // Intermediate roll calls are required for trips of 2+ calendar days (1+ nights)
+          // Intermediate roll calls are required for trips of 3+ calendar days (2+ nights)
           // Examples:
           // - 5/26～5/26 (same day, 1 calendar day): No intermediate needed
-          // - 5/26～5/27 (1 night, 2 calendar days): 1 intermediate needed on 27th
+          // - 5/26～5/27 (1 night, 2 calendar days): No intermediate needed - direct to end registration
           // - 5/26～5/28 (2 nights, 3 calendar days): 2 intermediates needed on 27th and 28th
           // - 5/26～5/30 (4 nights, 5 calendar days): 4 intermediates needed on 27th, 28th, 29th, and 30th
-          if (daysDiff >= 2) {
-            console.log('🔍 Trip is 2+ calendar days (1+ nights), intermediate roll calls required');
+          if (daysDiff >= 3) {
+            console.log('🔍 Trip is 3+ calendar days (2+ nights), intermediate roll calls required');
             
             // Get trip progress for this driver
             const progress = await getTripProgress(latestSubmission.driverName || '');
@@ -556,7 +558,7 @@ function App({ user = null }: AppProps) {
               setCurrentWorkflowState('needsMiddle');
             }
           } else {
-            console.log('🔍 Trip is 1 calendar day (same day), no intermediate roll calls needed');
+            console.log('🔍 Trip is 1-2 calendar days (same day or 1 night), no intermediate roll calls needed');
             setCurrentWorkflowState('needsEnd');
           }
         } else {
@@ -654,7 +656,9 @@ function App({ user = null }: AppProps) {
       const boardingDateOnly = new Date(boardingDate.getFullYear(), boardingDate.getMonth(), boardingDate.getDate());
       const alightingDateOnly = new Date(alightingDate.getFullYear(), alightingDate.getMonth(), alightingDate.getDate());
       const totalDays = Math.ceil((alightingDateOnly.getTime() - boardingDateOnly.getTime()) / (1000 * 3600 * 24)) + 1;
-      const totalIntermediatesNeeded = totalDays - 1; // One intermediate for each day except start day
+      // Intermediate roll calls are only needed for trips of 3+ calendar days (2+ nights)
+      // For 1-2 calendar days (same day or 1 night), no intermediates needed
+      const totalIntermediatesNeeded = totalDays >= 3 ? totalDays - 1 : 0;
 
       // Get all intermediate submissions for this trip using paginated query
       const intermediateSubmissions = await getAllSubmissions({
@@ -1276,11 +1280,18 @@ function App({ user = null }: AppProps) {
   };
 
   // Function to handle registration type selection
-  const handleRegistrationTypeSelect = (type: 'start' | 'middle' | 'end') => {
+  const handleRegistrationTypeSelect = (type: 'start' | 'middle' | 'end' | 'manual') => {
     // Only allow selection if the button is enabled
     if (type === 'start' && !isStartButtonEnabled()) return;
     if (type === 'middle' && !isMiddleButtonEnabled()) return;
     if (type === 'end' && !isEndButtonEnabled()) return;
+    
+    if (type === 'manual') {
+      // Manual registration is always available to registered drivers
+      if (isRegisteredDriver !== true) return;
+      setShowManualForm(true);
+      return;
+    }
     
     setRegistrationType(type);
     setShowForm(true);
@@ -1292,11 +1303,22 @@ function App({ user = null }: AppProps) {
       case 'start': return '運転開始登録';
       case 'middle': return '中間点呼登録';
       case 'end': return '運転終了登録';
+      case 'manual': return '手動登録';
       default: return '車両使用届';
     }
   };
 
+  // Function to handle manual form success
+  const handleManualFormSuccess = () => {
+    setShowManualForm(false);
+    setUploadStatus(null);
+  };
 
+  // Function to handle manual form close
+  const handleManualFormClose = () => {
+    setShowManualForm(false);
+    setUploadStatus(null);
+  };
 
   // Fix the resetForm function - preserve Azure AD driver name
   const resetForm = () => {
@@ -1518,7 +1540,13 @@ function App({ user = null }: AppProps) {
           </div>
 
           {/* Registration Type Selection or Form */}
-          {!showForm ? (
+          {showManualForm ? (
+            <ManualRegistrationForm
+              user={user}
+              onClose={handleManualFormClose}
+              onSuccess={handleManualFormSuccess}
+            />
+          ) : !showForm ? (
             <div className="space-y-8 animate-fadeIn min-h-[70vh] flex flex-col">
               {/* Welcome Section */}
               <div className="text-center space-y-4 mb-12 flex-1">
@@ -1654,7 +1682,7 @@ function App({ user = null }: AppProps) {
               </div>
               
               {/* Enhanced Registration Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 flex-1">
                 {/* Start Registration Card */}
                 <div 
                   onClick={() => isStartButtonEnabled() && handleRegistrationTypeSelect('start')}
@@ -1735,6 +1763,33 @@ function App({ user = null }: AppProps) {
                       <p className="text-green-100 text-sm lg:text-base">
                         運転終了前の最終チェック
                       </p>
+                      <div className="pt-4">
+                        <div className="inline-flex items-center gap-2 text-sm bg-white/20 rounded-full px-4 py-2 group-hover:bg-white/30 transition-colors duration-300">
+                          <span>開始する</span>
+                          <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Manual Registration Card */}
+                <div 
+                  onClick={() => isRegisteredDriver === true && handleRegistrationTypeSelect('manual')}
+                  className={getButtonClassName(isRegisteredDriver === true)}
+                >
+                  <div className="relative bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 overflow-hidden h-full">
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+                    <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+                    <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full"></div>
+                    
+                    {/* Content */}
+                    <div className="relative z-10 text-center text-white space-y-4 h-full flex flex-col justify-center">
+                      <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
+                        ⚙️
+                      </div>
+                      <h3 className="text-xl lg:text-2xl font-bold">手動登録</h3>
                       <div className="pt-4">
                         <div className="inline-flex items-center gap-2 text-sm bg-white/20 rounded-full px-4 py-2 group-hover:bg-white/30 transition-colors duration-300">
                           <span>開始する</span>
@@ -2739,7 +2794,7 @@ function App({ user = null }: AppProps) {
                     className="flex-1 p-3 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="検査結果を入力してください"
                   />
-                  <span className="inline-flex items-center px-3 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r-md">
+                  <span className="inline-flex items-center px-3 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm font-medium border-l border-gray-200">
                     mg
                   </span>
                 </div>
