@@ -3,6 +3,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
+import { getAllSubmissions, getAllDrivers } from '../utils/paginationHelper';
 
 import { isKachoLevel } from '../config/authConfig';
 
@@ -52,19 +53,23 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
   const loadPendingSubmissions = async () => {
     try {
-      client.models.AlcoholCheckSubmission.observeQuery().subscribe({
-        next: (data) => {
-          const pending = data.items.filter(item => 
-            item && item.id && item.approvalStatus === 'PENDING'
-          );
-          console.log('🔍 Loaded pending submissions:', pending.length);
-          console.log('🔍 Loaded submission details for processing');
-          setPendingSubmissions(pending);
-        },
+      console.log('📄 Loading pending submissions with pagination...');
+      setStatus('承認待ち申請を読み込み中...');
+      
+      // Get ALL pending submissions using paginated query
+      const pending = await getAllSubmissions({
+        approvalStatus: 'PENDING',
+        maxItems: 10000 // Reasonable limit for pending submissions
       });
+      
+      console.log('🔍 Loaded pending submissions:', pending.length);
+      console.log('🔍 Loaded submission details for processing');
+      setPendingSubmissions(pending);
+      setStatus(`✅ ${pending.length}件の承認待ち申請を読み込みました`);
+      
     } catch (error) {
       console.error('Failed to load pending submissions:', error);
-      setStatus('承認待ち一覧の読み込みに失敗しました');
+      setStatus('承認待ち一覧の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -100,12 +105,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       
       console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
       
-      // Load all drivers from the Driver schema
-      const result = await client.models.Driver.list({
-        filter: { isDeleted: { eq: false } }
-      });
-      
-      const drivers = result.data;
+      // Load all drivers using paginated query
+      const drivers = await getAllDrivers({ excludeDeleted: true });
       console.log('📋 Loaded drivers from schema:', drivers.length);
       
       for (const mailNickname of uniqueDrivers) {

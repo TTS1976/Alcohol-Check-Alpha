@@ -3,6 +3,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
+import { getAllSubmissions, getAllDrivers } from '../utils/paginationHelper';
 
 
 // Configure client to use API key for public access
@@ -74,21 +75,34 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
   const loadSubmissions = async () => {
     try {
-      client.models.AlcoholCheckSubmission.observeQuery().subscribe({
-        next: async (data) => {
-          // Filter to show both PENDING and APPROVED submissions
-          const relevantSubmissions = data.items.filter(item => 
-            item && item.id && (item.approvalStatus === 'APPROVED' || item.approvalStatus === 'PENDING')
-          );
-          setAllSubmissions(relevantSubmissions);
-          
-          // Fetch related submissions for end registrations
-          await fetchRelatedSubmissions(relevantSubmissions);
-        },
+      console.log('📄 Loading all submissions with pagination...');
+      setStatus('申請データを読み込み中...');
+      
+      // Get ALL submissions using paginated query - filter for PENDING and APPROVED only
+      const allPendingSubmissions = await getAllSubmissions({
+        approvalStatus: 'PENDING',
+        maxItems: 25000 // Reasonable limit for safety management view
       });
+      
+      const allApprovedSubmissions = await getAllSubmissions({
+        approvalStatus: 'APPROVED', 
+        maxItems: 25000 // Reasonable limit for safety management view
+      });
+      
+      // Combine both arrays
+      const relevantSubmissions = [...allPendingSubmissions, ...allApprovedSubmissions];
+      
+      console.log(`📊 Loaded ${relevantSubmissions.length} total submissions (${allPendingSubmissions.length} pending + ${allApprovedSubmissions.length} approved)`);
+      
+      setAllSubmissions(relevantSubmissions);
+      setStatus(`✅ ${relevantSubmissions.length}件の申請を読み込みました`);
+      
+      // Fetch related submissions for end registrations
+      await fetchRelatedSubmissions(relevantSubmissions);
+      
     } catch (error) {
       console.error('Failed to load submissions:', error);
-      setStatus('申請一覧の読み込みに失敗しました');
+      setStatus('申請一覧の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -275,12 +289,8 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
       
       console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
       
-      // Load all drivers from the Driver schema
-      const result = await client.models.Driver.list({
-        filter: { isDeleted: { eq: false } }
-      });
-      
-      const drivers = result.data;
+      // Load all drivers using paginated query
+      const drivers = await getAllDrivers({ excludeDeleted: true });
       console.log('📋 Loaded drivers from schema:', drivers.length);
       
       for (const mailNickname of uniqueDrivers) {

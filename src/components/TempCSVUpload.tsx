@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { getAllSubmissions } from '../utils/paginationHelper';
 
 // Configure client to use API key for public access
 const client = generateClient<Schema>({
@@ -121,8 +122,8 @@ const TempCSVUpload: React.FC<TempCSVUploadProps> = ({ onBack }) => {
       // First, test if we can connect to DynamoDB
       console.log('Testing DynamoDB connection...');
       try {
-        const testList = await client.models.AlcoholCheckSubmission.list({ limit: 1 });
-        console.log('✅ DynamoDB connection successful. Current record count:', testList.data?.length || 0);
+        const testList = await getAllSubmissions({ maxItems: 1 });
+        console.log('✅ DynamoDB connection successful. Current record count:', testList.length);
         console.log('✅ Table is accessible');
       } catch (connectionError) {
         console.error('❌ DynamoDB connection failed:', connectionError);
@@ -201,10 +202,10 @@ const TempCSVUpload: React.FC<TempCSVUploadProps> = ({ onBack }) => {
       if (successCount > 0) {
         console.log(`Successfully uploaded ${successCount} records to DynamoDB`);
         
-        // Verify records were actually saved
+        // Verify records were actually saved using paginated query
         try {
-          const verifyList = await client.models.AlcoholCheckSubmission.list();
-          console.log(`✅ Verification: Total records now in DynamoDB: ${verifyList.data?.length || 0}`);
+          const verifyList = await getAllSubmissions({ maxItems: 1000 });
+          console.log(`✅ Verification: Total records now in DynamoDB: ${verifyList.length}`);
         } catch (verifyError) {
           console.error('❌ Failed to verify records:', verifyError);
         }
@@ -223,9 +224,9 @@ const TempCSVUpload: React.FC<TempCSVUploadProps> = ({ onBack }) => {
   const testDynamoDBConnection = async () => {
     try {
       console.log('Testing DynamoDB connection...');
-      const result = await client.models.AlcoholCheckSubmission.list({ limit: 5 });
+      const result = await getAllSubmissions({ maxItems: 5 });
       console.log('DynamoDB test result:', result);
-      alert(`✅ 接続成功！現在のレコード数: ${result.data?.length || 0}`);
+      alert(`✅ 接続成功！現在のレコード数: ${result.length}`);
     } catch (error) {
       console.error('DynamoDB test failed:', error);
       alert(`❌ 接続失敗: ${error instanceof Error ? error.message : 'Unknown error'}`);
