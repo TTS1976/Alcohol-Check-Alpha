@@ -1418,6 +1418,18 @@ function App({ user = null }: AppProps) {
               
               {/* Navigation Buttons */}
               <div className="flex flex-wrap gap-2">
+                {/* License Renewal Button - Available to all verified users */}
+                {isRegisteredDriver === true && (
+                  <button
+                    onClick={() => window.open('https://forms.office.com/pages/responsepage.aspx?id=wgC36NrMpUi5DsfOZ75lRkZnbyGCmy1Kj4J4oLV_09FUNlVOVkxHSEYyRzVSNFZQUEhET0UzR08wOC4u', '_blank')}
+                    className="group px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 text-sm font-medium transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    <span className="flex items-center gap-2">
+                      📋 免許証更新
+                    </span>
+                  </button>
+                )}
+                
                 {isFullAdmin && (
                   <>
                     <button
