@@ -20,6 +20,9 @@ import TempCSVUpload from './components/TempCSVUpload';
 import teralSafetyIcon from './assets/teralsafety.png';
 import './App.css';
 
+// Import pagination helpers
+import { getAllDrivers, getAllSubmissions } from './utils/paginationHelper';
+
 // Configure client to use API key for public access
 const client = generateClient<Schema>({
   authMode: 'apiKey'
@@ -181,11 +184,10 @@ function App({ user = null }: AppProps) {
 
       try {
         const userEmail = user.email || user.mailNickname + '@domain.com';
-        const result = await client.models.Driver.list({
-          filter: { isDeleted: { eq: false } }
-        });
+        // Use paginated query to get ALL drivers
+        const allDrivers = await getAllDrivers({ excludeDeleted: true });
         
-        const matchedDriver = result.data.find(driver => {
+        const matchedDriver = allDrivers.find(driver => {
           if (!driver.mail) return false;
           // Check both email and mailNickname matching
           const driverEmail = driver.mail.toLowerCase();
@@ -408,12 +410,8 @@ function App({ user = null }: AppProps) {
       // Get the logged-in user's email nickname
       const userNickname = user.mailNickname.toLowerCase();
       
-      // Load all drivers and check for match
-      const result = await client.models.Driver.list({
-        filter: { isDeleted: { eq: false } }
-      });
-      
-      const driverList = result.data;
+      // Load all drivers and check for match using paginated query
+      const driverList = await getAllDrivers({ excludeDeleted: true });
       console.log('Loaded drivers for validation:', driverList.length);
       
       // Check if any driver's email nickname matches the logged-in user
@@ -455,25 +453,15 @@ function App({ user = null }: AppProps) {
       setIsWorkflowLoading(true);
       console.log('🔍 Checking workflow state for user');
       
-      // First, get ALL submissions for debugging
-      const allSubmissions = await client.models.AlcoholCheckSubmission.list({
-        filter: { 
-          submittedBy: { eq: user.mailNickname }
-        }
+      // Get ALL submissions for the user using paginated query
+      const allSubmissions = await getAllSubmissions({
+        submittedBy: user.mailNickname,
+        maxItems: 10000 // Reasonable limit for user's submissions
       });
       
-      console.log('🔍 Total submissions found:', allSubmissions.data?.length || 0);
-      
-      // Get user's most recent submissions (APPROVED, REJECTED, and PENDING)
-      const result = await client.models.AlcoholCheckSubmission.list({
-        filter: { 
-          submittedBy: { eq: user.mailNickname }
-        }
-      });
+      console.log('🔍 Total submissions found:', allSubmissions.length);
 
-      console.log('🔍 Total submissions found:', result.data?.length || 0);
-
-      if (!result.data || result.data.length === 0) {
+      if (!allSubmissions || allSubmissions.length === 0) {
         console.log('🔍 No submissions found, setting to initial state');
         setCurrentWorkflowState('initial');
         setIsWorkflowLoading(false);
@@ -481,7 +469,7 @@ function App({ user = null }: AppProps) {
       }
 
       // Sort by submission date to get the most recent
-      const sortedSubmissions = result.data.sort((a, b) => 
+      const sortedSubmissions = allSubmissions.sort((a, b) => 
         new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime()
       );
 
@@ -639,20 +627,21 @@ function App({ user = null }: AppProps) {
   // Function to get trip progress information
   const getTripProgress = useCallback(async (driverName: string) => {
     try {
-      // Find the latest start submission for this driver
-      const startSubmissions = await client.models.AlcoholCheckSubmission.list({
-        filter: {
-          driverName: { eq: driverName },
-          registrationType: { eq: '運転開始登録' },
-          approvalStatus: { ne: 'REJECTED' }
-        }
+      // Find the latest start submission for this driver using paginated query
+      const startSubmissions = await getAllSubmissions({
+        registrationType: '運転開始登録',
+        excludeRejected: true,
+        maxItems: 5000 // Reasonable limit for start submissions
       });
 
-      if (!startSubmissions.data || startSubmissions.data.length === 0) {
+      // Filter by driver name (need to do this after fetching due to query limitations)
+      const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === driverName);
+
+      if (!driverStartSubmissions || driverStartSubmissions.length === 0) {
         return null;
       }
 
-      const latestStart = startSubmissions.data.sort((a, b) => 
+      const latestStart = driverStartSubmissions.sort((a, b) => 
         new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime()
       )[0];
 
@@ -667,17 +656,18 @@ function App({ user = null }: AppProps) {
       const totalDays = Math.ceil((alightingDateOnly.getTime() - boardingDateOnly.getTime()) / (1000 * 3600 * 24)) + 1;
       const totalIntermediatesNeeded = totalDays - 1; // One intermediate for each day except start day
 
-      // Get all intermediate submissions for this trip
-      const intermediateSubmissions = await client.models.AlcoholCheckSubmission.list({
-        filter: {
-          driverName: { eq: driverName },
-          registrationType: { eq: '中間点呼登録' },
-          relatedSubmissionId: { eq: latestStart.id },
-          approvalStatus: { ne: 'REJECTED' }
-        }
+      // Get all intermediate submissions for this trip using paginated query
+      const intermediateSubmissions = await getAllSubmissions({
+        registrationType: '中間点呼登録',
+        relatedSubmissionId: latestStart.id,
+        excludeRejected: true,
+        maxItems: 1000 // Reasonable limit for intermediate submissions
       });
 
-      const completedIntermediates = intermediateSubmissions.data?.length || 0;
+      // Filter by driver name after fetching
+      const driverIntermediateSubmissions = intermediateSubmissions.filter(sub => sub.driverName === driverName);
+
+      const completedIntermediates = driverIntermediateSubmissions.length;
       const remainingIntermediates = Math.max(0, totalIntermediatesNeeded - completedIntermediates);
 
       // Check if today is the alighting day (final day)
@@ -685,10 +675,10 @@ function App({ user = null }: AppProps) {
 
       // Check if we already did an intermediate today (prevent duplicates except on final day)
       const todayStr = currentDate.toDateString();
-      const hasIntermediateToday = intermediateSubmissions.data?.some(sub => {
+      const hasIntermediateToday = driverIntermediateSubmissions.some(sub => {
         const subDate = new Date(sub.submittedAt || '');
         return subDate.toDateString() === todayStr;
-      }) || false;
+      });
 
       return {
         totalDays,
@@ -877,34 +867,36 @@ function App({ user = null }: AppProps) {
       
       if (registrationType === 'end') {
         drivingStatus = "運転終了";
-        // Find the latest start registration for this driver (include PENDING submissions for relationship)
-        const startSubmissions = await client.models.AlcoholCheckSubmission.list({
-          filter: {
-            driverName: { eq: formData.driverName },
-            registrationType: { eq: '運転開始登録' }
-            // Removed approvalStatus filter to include PENDING submissions
-          }
+        // Find the latest start registration for this driver using paginated query
+        const startSubmissions = await getAllSubmissions({
+          registrationType: '運転開始登録',
+          maxItems: 2000 // Reasonable limit for start submissions
         });
-        console.log('🔍 Found start submissions for end registration:', startSubmissions.data?.length);
-        console.log('🔍 Start submissions:', startSubmissions.data?.map(s => ({ id: s.id, status: s.approvalStatus, submittedAt: s.submittedAt })));
-        if (startSubmissions.data && startSubmissions.data.length > 0) {
-          const latestStart = startSubmissions.data.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+        
+        // Filter by driver name after fetching
+        const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === formData.driverName);
+        
+        console.log('🔍 Found start submissions for end registration:', driverStartSubmissions.length);
+        console.log('🔍 Start submissions:', driverStartSubmissions.map(s => ({ id: s.id, status: s.approvalStatus, submittedAt: s.submittedAt })));
+        if (driverStartSubmissions && driverStartSubmissions.length > 0) {
+          const latestStart = driverStartSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
           console.log('🔗 Set relatedSubmissionId for end registration:', relatedSubmissionId);
         }
       } else if (registrationType === 'middle') {
-        // For middle registration, find the latest start registration for this driver (include PENDING submissions for relationship)
-        const startSubmissions = await client.models.AlcoholCheckSubmission.list({
-          filter: {
-            driverName: { eq: formData.driverName },
-            registrationType: { eq: '運転開始登録' }
-            // Removed approvalStatus filter to include PENDING submissions
-          }
+        // For middle registration, find the latest start registration for this driver using paginated query
+        const startSubmissions = await getAllSubmissions({
+          registrationType: '運転開始登録',
+          maxItems: 2000 // Reasonable limit for start submissions
         });
-        console.log('🔍 Found start submissions for middle registration:', startSubmissions.data?.length);
-        if (startSubmissions.data && startSubmissions.data.length > 0) {
+        
+        // Filter by driver name after fetching
+        const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === formData.driverName);
+        
+        console.log('🔍 Found start submissions for middle registration:', driverStartSubmissions.length);
+        if (driverStartSubmissions && driverStartSubmissions.length > 0) {
           // Sort by submittedAt descending and pick the latest
-          const latestStart = startSubmissions.data.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+          const latestStart = driverStartSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
           console.log('🔗 Set relatedSubmissionId for middle registration:', relatedSubmissionId);
         }
