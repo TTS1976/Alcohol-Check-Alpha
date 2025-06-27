@@ -367,8 +367,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkUserRole = (requiredRole: UserRole): boolean => {
     if (!authState.user) return false;
     
-    // TEMPORARY: Give syed00 full admin privileges for testing
-    if (authState.user.mailNickname === 'syed00') {
+    // TEMPORARY: Give tts_admin1@teral365.onmicrosoft.com full admin privileges for testing
+    if (authState.user.email === 'tts_admin1@teral365.onmicrosoft.com') {
       return true; // Grant all permissions
     }
     
@@ -381,8 +381,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const canSelectConfirmer = (confirmerId: string): boolean => {
     if (!authState.user) return false;
     
-    // TEMPORARY: Give syed00 full confirmer selection privileges for testing
-    if (authState.user.mailNickname === 'syed00') {
+    // TEMPORARY: Give tts_admin1@teral365.onmicrosoft.com full confirmer selection privileges for testing
+    if (authState.user.email === 'tts_admin1@teral365.onmicrosoft.com') {
       return true; // Can select any confirmer
     }
     

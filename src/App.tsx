@@ -212,9 +212,9 @@ function App({ user = null }: AppProps) {
     checkUserFullAdminStatus();
   }, [user]);
 
-  // TEMPORARY: Give syed00 full admin privileges for testing
-  const isFullAdmin = user?.role === 'SafeDrivingManager' || user?.mailNickname === 'syed00' || userFullAdminStatus;
-  const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || user?.mailNickname === 'syed00' || userFullAdminStatus;
+  // TEMPORARY: Give tts_admin1@teral365.onmicrosoft.com full admin privileges for testing
+  const isFullAdmin = user?.role === 'SafeDrivingManager' || user?.email === 'tts_admin1@teral365.onmicrosoft.com' || userFullAdminStatus;
+  const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || user?.email === 'tts_admin1@teral365.onmicrosoft.com' || userFullAdminStatus;
   const isViewerAdmin = isManager;
   const isAnyAdmin = isFullAdmin || isViewerAdmin;
   
@@ -223,8 +223,8 @@ function App({ user = null }: AppProps) {
     console.log('Permission check completed');
   }, [user, userFullAdminStatus, isFullAdmin, isManager, isAnyAdmin]);
   
-  // TEMPORARY: Override user role for testing - give syed00 SafeDrivingManager access
-  const tempUser = user?.mailNickname === 'syed00' ? { ...user, role: 'SafeDrivingManager' } : user;
+  // TEMPORARY: Override user role for testing - give tts_admin1@teral365.onmicrosoft.com SafeDrivingManager access
+  const tempUser = user?.email === 'tts_admin1@teral365.onmicrosoft.com' ? { ...user, role: 'SafeDrivingManager' } : user;
 
   // Add this state for the clock at the top with other state declarations
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -377,17 +377,7 @@ function App({ user = null }: AppProps) {
         });
       }
 
-      // TEMPORARY: Add test confirmers for syed00 to ensure form submission works
-      if (user.mailNickname === 'syed00' && confirmers.length === 0) {
-        // Use a valid UUID format for testing
-        confirmers.push({
-          id: '12345678-1234-1234-1234-123456789abc', // Valid UUID format for testing
-          name: 'Motomura Test User',
-          email: 'motomura00@teral.co.jp',
-          role: '上司',
-          azureId: '12345678-1234-1234-1234-123456789abc'
-        });
-      }
+
 
       // Self-confirmation removed as per user request
 
@@ -1244,30 +1234,30 @@ function App({ user = null }: AppProps) {
 
   // Check if entire form is valid (driver name auto-populated from Azure AD, confirmer selection required)
   // Image upload is now required again for form submission
-  const isFormValid = (registrationType === 'end' || registrationType === 'middle')
-    ? formData.inspectionResultEnd.trim() !== '' &&
-      formData.selectedConfirmer.trim() !== '' &&
-      isInspectionResultValid(formData.inspectionResultEnd) &&
-      isImageUploaded
-    : isVehicleFormValid &&
-      isSafetyFormValid &&
-      formData.inspectionResult.trim() !== '' &&
-      formData.selectedConfirmer.trim() !== '' &&
-      isInspectionResultValid(formData.inspectionResult) &&
-      isImageUploaded;
+  // const isFormValid = (registrationType === 'end' || registrationType === 'middle')
+  //   ? formData.inspectionResultEnd.trim() !== '' &&
+  //     formData.selectedConfirmer.trim() !== '' &&
+  //     isInspectionResultValid(formData.inspectionResultEnd) &&
+  //     isImageUploaded
+  //   : isVehicleFormValid &&
+  //     isSafetyFormValid &&
+  //     formData.inspectionResult.trim() !== '' &&
+  //     formData.selectedConfirmer.trim() !== '' &&
+  //     isInspectionResultValid(formData.inspectionResult) &&
+  //     isImageUploaded;
 
   // Disable picture requirement
-  // const isFormValid = (registrationType === 'end' || registrationType === 'middle')
-  // ? formData.inspectionResultEnd.trim() !== '' &&
-  //   formData.selectedConfirmer.trim() !== '' &&
-  //   isInspectionResultValid(formData.inspectionResultEnd)
-  //   // && isImageUploaded  // DISABLED FOR TESTING
-  // : isVehicleFormValid &&
-  //   isSafetyFormValid &&
-  //   formData.inspectionResult.trim() !== '' &&
-  //   formData.selectedConfirmer.trim() !== '' &&
-  //   isInspectionResultValid(formData.inspectionResult);
-  //   // && isImageUploaded;  // DISABLED FOR TESTING
+  const isFormValid = (registrationType === 'end' || registrationType === 'middle')
+  ? formData.inspectionResultEnd.trim() !== '' &&
+    formData.selectedConfirmer.trim() !== '' &&
+    isInspectionResultValid(formData.inspectionResultEnd)
+    // && isImageUploaded  // DISABLED FOR TESTING
+  : isVehicleFormValid &&
+    isSafetyFormValid &&
+    formData.inspectionResult.trim() !== '' &&
+    formData.selectedConfirmer.trim() !== '' &&
+    isInspectionResultValid(formData.inspectionResult);
+    // && isImageUploaded;  // DISABLED FOR TESTING
 
   // Add function to check if expiration date is within 3 months
   const isExpirationSoon = (expirationDate: string): boolean => {
