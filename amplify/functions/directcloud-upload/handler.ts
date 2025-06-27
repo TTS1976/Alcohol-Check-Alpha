@@ -41,7 +41,7 @@ export const handler: Handler = async (event) => {
       contentType
     } = event;
     
-    console.log('Parsed input:', { fileName, contentType, fileDataLength: fileData?.length });
+    console.log('Parsed input - fileName provided:', !!fileName, 'contentType:', contentType, 'fileDataLength:', fileData?.length);
     
     // Validate required parameters to prevent infinite loops with invalid data
     if (!fileName || !fileData) {

@@ -1,6 +1,7 @@
 import { Client } from '@microsoft/microsoft-graph-client';
 import { AuthenticationProvider } from '@microsoft/microsoft-graph-client';
 import { AccountInfo } from '@azure/msal-browser';
+import { logger } from '../utils/logger';
 import { GraphUser, GraphManager, GraphDirectReport, AppUser } from '../types/auth';
 import { ROLES, JOB_LEVEL_THRESHOLD, UserRole, parseJobTitle } from '../config/authConfig';
 
@@ -266,11 +267,11 @@ export class GraphService {
       const vehiclePrefix = this.getVehiclePrefixByDepartment(userDepartment);
       
       if (!vehiclePrefix) {
-        console.warn('No vehicle prefix found for department:', userDepartment);
+        logger.warn('No vehicle prefix found for department:', userDepartment);
         return [];
       }
 
-      console.log('Fetching vehicles with department-specific prefix');
+      logger.debug('Fetching vehicles with department-specific prefix');
 
       // Query Azure AD users whose displayName starts with the vehicle prefix
       const response = await this.graphClient
@@ -289,11 +290,11 @@ export class GraphService {
         };
       });
 
-      console.log(`Found ${vehicleUsers.length} vehicle users for department`);
+      logger.debug(`Found ${vehicleUsers.length} vehicle users for department`);
       return vehicleUsers;
 
     } catch (error) {
-      console.error('Error fetching vehicle users from Azure AD:', error);
+      logger.error('Error fetching vehicle users from Azure AD:', error);
       throw error;
     }
   }

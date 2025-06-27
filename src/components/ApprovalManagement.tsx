@@ -3,7 +3,8 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllSubmissions, getAllDrivers } from '../utils/paginationHelper';
+import { getSubmissionsPaginated, getDriversPaginated } from '../utils/paginationHelper';
+import { logger } from '../utils/logger';
 
 import { isKachoLevel } from '../config/authConfig';
 
@@ -18,6 +19,10 @@ interface ApprovalManagementProps {
 
 const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user }) => {
   const { checkUserRole, graphService } = useAuth();
+  
+
+  
+  // Legacy states
   const [pendingSubmissions, setPendingSubmissions] = useState<any[]>([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +32,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
   const [vehicleNames, setVehicleNames] = useState<{[key: string]: string}>({});
   const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
-  const itemsPerPage = 10;
+  const itemsPerPage = 20; // Increased for better performance
 
 
 
@@ -49,27 +54,26 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     }
   }, [pendingSubmissions, graphService]);
 
-
-
+    // NEW: Load initial pending submissions with pagination
   const loadPendingSubmissions = async () => {
     try {
-      console.log('📄 Loading pending submissions with pagination...');
+      logger.info('Loading pending submissions with server-side pagination...');
       setStatus('承認待ち申請を読み込み中...');
       
-      // Get ALL pending submissions using paginated query
-      const pending = await getAllSubmissions({
+      // Load pending submissions only (50 items by default)
+      const result = await getSubmissionsPaginated({
         approvalStatus: 'PENDING',
-        maxItems: 10000 // Reasonable limit for pending submissions
+        limit: 50
       });
       
-      console.log('🔍 Loaded pending submissions:', pending.length);
-      console.log('🔍 Loaded submission details for processing');
-      setPendingSubmissions(pending);
-      setStatus(`✅ ${pending.length}件の承認待ち申請を読み込みました`);
+      logger.info(`Loaded ${result.items.length} pending submissions`);
+      
+      setPendingSubmissions(result.items);
+      setStatus(`✅ ${result.items.length}件の承認待ち申請を読み込みました`);
       
     } catch (error) {
-      console.error('Failed to load pending submissions:', error);
-      setStatus('承認待ち一覧の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      logger.error('Failed to load pending submissions:', error);
+      setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -86,13 +90,13 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
       if (vehicleIds.length === 0) return;
 
-      console.log('Resolving vehicle names for', vehicleIds.length, 'vehicles');
+      logger.debug('Resolving vehicle names for', vehicleIds.length, 'vehicles');
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
       
       setVehicleNames(prev => ({ ...prev, ...resolved }));
-      console.log('Resolved', Object.keys(resolved).length, 'vehicle names');
+      logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
     } catch (error) {
-      console.error('Failed to resolve vehicle names:', error);
+      logger.error('Failed to resolve vehicle names:', error);
     }
   };
 
@@ -103,15 +107,19 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       // Get unique driver identifiers from submissions (these are mailNicknames)
       const uniqueDrivers = [...new Set(pendingSubmissions.map(s => s.driverName).filter(Boolean))];
       
-      console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
+      logger.debug('Resolving driver names for', uniqueDrivers.length, 'drivers');
       
-      // Load all drivers using paginated query
-      const drivers = await getAllDrivers({ excludeDeleted: true });
-      console.log('📋 Loaded drivers from schema:', drivers.length);
+      // Load drivers using new paginated approach
+      const driversResult = await getDriversPaginated({ 
+        excludeDeleted: true,
+        limit: 100 // Load more drivers at once for mapping
+      });
+      
+      logger.debug('Loaded drivers from schema:', driversResult.items.length);
       
       for (const mailNickname of uniqueDrivers) {
         // Find the driver by matching the mailNickname with the email prefix
-        const matchedDriver = drivers.find(driver => {
+        const matchedDriver = driversResult.items.find(driver => {
           if (!driver.mail) return false;
           const emailPrefix = driver.mail.split('@')[0].toLowerCase();
           return emailPrefix === mailNickname.toLowerCase();
@@ -119,16 +127,16 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         
         if (matchedDriver && matchedDriver.name) {
           driverMap[mailNickname] = matchedDriver.name;
-          console.log(`✅ Resolved driver name successfully`);
+          logger.debug(`Resolved driver name successfully`);
         } else {
-                      console.log(`❌ Could not resolve driver name`);
+          logger.debug(`Could not resolve driver name`);
         }
       }
       
-      console.log('🎯 Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
+      logger.debug('Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
       setDriverNames(driverMap);
     } catch (error) {
-      console.error('Error resolving driver names:', error);
+      logger.error('Error resolving driver names:', error);
     }
   };
 
@@ -148,12 +156,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     // Apply role-based filtering - show only submissions where current user is the selected confirmer
     if (user) {
-      console.log('🔍 Filtering submissions for user');
-      console.log('🔍 Checking user permissions');
+      logger.debug('Filtering submissions for user');
+      logger.debug('Checking user permissions');
       
       if (checkUserRole('SafeDrivingManager')) {
         // SafeDrivingManager can see all submissions
-        console.log('🔍 User is SafeDrivingManager - showing all submissions');
+        logger.debug('User is SafeDrivingManager - showing all submissions');
       } else {
         // For regular users, only show submissions where they are the selected confirmer
         const originalFiltered = filtered;
@@ -173,12 +181,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         
         // If no submissions matched exact criteria, show a warning
         if (filtered.length === 0 && originalFiltered.length > 0) {
-          console.warn('⚠️ No submissions matched user identifiers exactly. This might indicate an ID mismatch issue.');
+          logger.warn('No submissions matched user identifiers exactly. This might indicate an ID mismatch issue.');
         }
       }
     }
 
-    console.log('🔍 Filtered submissions count:', filtered.length);
+    logger.debug('Filtered submissions count:', filtered.length);
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
   };

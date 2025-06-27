@@ -8,13 +8,14 @@ import { msalConfig, loginRequest } from '../config/authConfig';
 import { AuthContextType, AuthState } from '../types/auth';
 import { GraphService } from '../services/graphService';
 import { UserRole } from '../config/authConfig';
+import { logger } from '../utils/logger';
 
 // Create MSAL instance
 const msalInstance = new PublicClientApplication(msalConfig);
 
 // Initialize MSAL
 msalInstance.initialize().then(() => {
-  console.log('MSAL initialized');
+  logger.info('MSAL initialized');
 });
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -242,13 +243,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setGraphService(tempGraphService);
       }
     } catch (error: any) {
-      console.error('Login failed:', error);
+      logger.error('Login failed:', error);
       
       // Clear cache on error to prevent stuck states
       try {
         await msalInstance.clearCache();
       } catch (clearError) {
-        console.error('Failed to clear cache after login error:', clearError);
+        logger.error('Failed to clear cache after login error:', clearError);
       }
       
       setAuthState(prev => ({
@@ -268,9 +269,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // First, force clear any ongoing interactions
       try {
         await msalInstance.clearCache();
-        console.log('Cache cleared successfully');
+        logger.debug('Cache cleared successfully');
       } catch (clearError) {
-        console.error('Error clearing cache:', clearError);
+        logger.error('Error clearing cache:', clearError);
       }
       
       // Reset local state immediately

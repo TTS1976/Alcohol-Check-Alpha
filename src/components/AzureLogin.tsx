@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import odlsIcon from '../assets/ODLS.png';
+import { logger } from '../utils/logger';
 
 const AzureLogin: React.FC = () => {
   const { login, isLoading, error } = useAuth();
@@ -14,7 +15,7 @@ const AzureLogin: React.FC = () => {
       // Force a fresh login
       await login();
     } catch (error) {
-      console.error('Clear cache and login error:', error);
+      logger.error('Clear cache and login error:', error);
     }
   };
 
@@ -22,11 +23,11 @@ const AzureLogin: React.FC = () => {
     try {
       await login();
     } catch (error: any) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       
       // If interaction_in_progress error, suggest using the clear cache button
       if (error?.message?.includes('interaction_in_progress')) {
-        console.log('Interaction in progress detected in AzureLogin, please use clear cache option');
+        logger.warn('Interaction in progress detected in AzureLogin, please use clear cache option');
       }
     }
   };

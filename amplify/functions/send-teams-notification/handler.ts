@@ -65,17 +65,17 @@ export const handler: Handler = async (event) => {
       userAccessToken
     } = event;
     
-    console.log('Parsed input:', { 
-      submissionId, 
-      content, 
-      submittedBy, 
-      confirmerName,
-      supervisorDisplayName,
-      supervisorEmail,
-      supervisorObjectId,
-      driverDisplayName,
-      driverEmail,
-      driverObjectId
+    console.log('Parsed input - fields provided:', { 
+      submissionId: !!submissionId, 
+      content: !!content, 
+      submittedBy: !!submittedBy, 
+      confirmerName: !!confirmerName,
+      supervisorDisplayName: !!supervisorDisplayName,
+      supervisorEmail: !!supervisorEmail,
+      supervisorObjectId: !!supervisorObjectId,
+      driverDisplayName: !!driverDisplayName,
+      driverEmail: !!driverEmail,
+      driverObjectId: !!driverObjectId
     });
     
     // Validate required parameters

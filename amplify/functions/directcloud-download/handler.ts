@@ -36,7 +36,7 @@ export const handler: Handler = async (event) => {
 
     const { fileName } = event;
     
-    console.log('Parsed input:', { fileName });
+    console.log('Parsed input - fileName provided:', !!fileName);
     
     // Validate required parameters to prevent infinite loops with invalid data
     if (!fileName) {
