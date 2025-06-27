@@ -17,7 +17,7 @@ const schema = a.schema({
   AlcoholCheckSubmission: a
     .model({
       // Add registration type field
-      registrationType: a.string().required(), // 運転開始登録, 中間点呼登録, 運転終了登録
+      registrationType: a.string().required(), // 運転開始登録, 中間点呼登録, 運転終了登録, 手動登録
       
       // Add driving status field
       drivingStatus: a.string().default("運転中"), // 運転中, 運転終了
