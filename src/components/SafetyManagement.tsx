@@ -3,7 +3,8 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllSubmissions, getAllDrivers } from '../utils/paginationHelper';
+import { getSubmissionsPaginated, getDriversPaginated } from '../utils/paginationHelper';
+import { logger } from '../utils/logger';
 
 
 // Configure client to use API key for public access
@@ -30,29 +31,41 @@ interface SubmissionGroup {
 
 const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => {
   const { graphService } = useAuth();
+  
+  // Server-side pagination state
+  const [currentSubmissions, setCurrentSubmissions] = useState<any[]>([]);
+  const [nextToken, setNextToken] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalLoaded, setTotalLoaded] = useState(0);
+  
+  // Legacy states for backward compatibility
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
   const [filteredSubmissions, setFilteredSubmissions] = useState<any[]>([]);
-  const [submissionGroups, setSubmissionGroups] = useState<SubmissionGroup[]>([]);
   const [filteredGroups, setFilteredGroups] = useState<SubmissionGroup[]>([]);
   const [relatedSubmissions, setRelatedSubmissions] = useState<Map<string, any>>(new Map()); // Store related submissions
+  
+  // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
   const [searchBy, setSearchBy] = useState<'all' | 'driverName' | 'vehicle' | 'approvedBy'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED'>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [viewMode, setViewMode] = useState<'grouped' | 'individual'>('grouped'); // New toggle for view mode
+  const [viewMode, setViewMode] = useState<'grouped' | 'individual'>('grouped');
+  
+  // UI states
   const [status, setStatus] = useState('');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [vehicleNames, setVehicleNames] = useState<{[key: string]: string}>({});
   const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
-  const itemsPerPage = 10;
+  const itemsPerPage = 20; // Increased from 10 since we're loading more efficiently
 
   // Temporarily bypass admin check for authentication removal
   // const isAdmin = true; // user?.signInDetails?.loginId === "tts-driver-admin@teral.co.jp" || user?.username === "tts-driver-admin@teral.co.jp" || user?.signInDetails?.loginId === "tts-driver@teral.co.jp" || user?.username === "tts-driver@teral.co.jp";
 
   useEffect(() => {
-    loadSubmissions();
+    loadInitialSubmissions();
   }, []);
 
   useEffect(() => {
@@ -73,38 +86,126 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
     }
   }, [allSubmissions, graphService]);
 
-  const loadSubmissions = async () => {
+  // NEW: Load initial submissions with server-side pagination
+  const loadInitialSubmissions = async () => {
+    setIsLoading(true);
     try {
-      console.log('📄 Loading all submissions with pagination...');
+      logger.info('Loading initial submissions with server-side pagination...');
       setStatus('申請データを読み込み中...');
       
-      // Get ALL submissions using paginated query - filter for PENDING and APPROVED only
-      const allPendingSubmissions = await getAllSubmissions({
-        approvalStatus: 'PENDING',
-        maxItems: 25000 // Reasonable limit for safety management view
+      // Load first page of submissions (50 items by default)
+      const result = await getSubmissionsPaginated({
+        limit: 50,
+        excludeRejected: true
       });
       
-      const allApprovedSubmissions = await getAllSubmissions({
-        approvalStatus: 'APPROVED', 
-        maxItems: 25000 // Reasonable limit for safety management view
-      });
+      logger.info(`Loaded ${result.items.length} initial submissions`);
       
-      // Combine both arrays
-      const relevantSubmissions = [...allPendingSubmissions, ...allApprovedSubmissions];
-      
-      console.log(`📊 Loaded ${relevantSubmissions.length} total submissions (${allPendingSubmissions.length} pending + ${allApprovedSubmissions.length} approved)`);
-      
-      setAllSubmissions(relevantSubmissions);
-      setStatus(`✅ ${relevantSubmissions.length}件の申請を読み込みました`);
+      setCurrentSubmissions(result.items);
+      setAllSubmissions(result.items); // Keep for backward compatibility
+      setNextToken(result.nextToken);
+      setHasMore(result.hasMore);
+      setTotalLoaded(result.items.length);
+      setStatus(`✅ ${result.items.length}件の申請を読み込みました${result.hasMore ? ' (さらに読み込み可能)' : ''}`);
       
       // Fetch related submissions for end registrations
-      await fetchRelatedSubmissions(relevantSubmissions);
+      await fetchRelatedSubmissions(result.items);
       
     } catch (error) {
-      console.error('Failed to load submissions:', error);
+      logger.error('Failed to load initial submissions:', error);
       setStatus('申請一覧の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // NEW: Load more submissions when user clicks "Load More"
+  const loadMoreSubmissions = async () => {
+    if (!hasMore || isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      logger.debug('Loading more submissions...');
+      setStatus('追加データを読み込み中...');
+      
+      const result = await getSubmissionsPaginated({
+        limit: 50,
+        nextToken: nextToken,
+        excludeRejected: true
+      });
+      
+      logger.debug(`Loaded ${result.items.length} additional submissions`);
+      
+      const newSubmissions = [...currentSubmissions, ...result.items];
+      setCurrentSubmissions(newSubmissions);
+      setAllSubmissions(newSubmissions); // Keep for backward compatibility
+      setNextToken(result.nextToken);
+      setHasMore(result.hasMore);
+      setTotalLoaded(newSubmissions.length);
+      setStatus(`✅ ${newSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (さらに読み込み可能)' : ''}`);
+      
+      // Fetch related submissions for new items
+      await fetchRelatedSubmissions(result.items);
+      
+    } catch (error) {
+      logger.error('Failed to load more submissions:', error);
+      setStatus('追加データの読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // NEW: Load submissions with specific filters
+  const loadFilteredSubmissions = async () => {
+    setIsLoading(true);
+    try {
+      logger.debug('Loading filtered submissions...');
+      setStatus('フィルター適用中...');
+      
+      let filter: any = {};
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filter.approvalStatus = statusFilter;
+      } else {
+        filter.excludeRejected = true;
+      }
+      
+      const result = await getSubmissionsPaginated({
+        ...filter,
+        limit: 100 // Load more when filtering
+      });
+      
+      logger.debug(`Loaded ${result.items.length} filtered submissions`);
+      
+      setCurrentSubmissions(result.items);
+      setAllSubmissions(result.items);
+      setNextToken(result.nextToken);
+      setHasMore(result.hasMore);
+      setTotalLoaded(result.items.length);
+      setStatus(`✅ ${result.items.length}件の申請を読み込みました (フィルター適用済み)`);
+      
+      // Reset pagination
+      setCurrentPage(1);
+      
+    } catch (error) {
+      logger.error('Failed to load filtered submissions:', error);
+      setStatus('フィルター適用に失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Apply filters button handler
+  const handleApplyFilters = () => {
+    if (statusFilter !== 'all' || searchTerm || dateFrom || dateTo) {
+      loadFilteredSubmissions();
+    } else {
+      loadInitialSubmissions();
+    }
+  };
+
+
 
   // Create grouped submissions
   const createSubmissionGroups = () => {
@@ -230,7 +331,6 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
     console.log('🎯 Final groups created:', groups.size);
     
-    setSubmissionGroups(Array.from(groups.values()));
     setFilteredGroups(groupsArray);
     setCurrentPage(1);
   };
@@ -289,13 +389,17 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
       
       console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
       
-      // Load all drivers using paginated query
-      const drivers = await getAllDrivers({ excludeDeleted: true });
-      console.log('📋 Loaded drivers from schema:', drivers.length);
+      // Load drivers using new paginated approach
+      const driversResult = await getDriversPaginated({ 
+        excludeDeleted: true,
+        limit: 100 // Load more drivers at once for mapping
+      });
+      
+      console.log('📋 Loaded drivers from schema:', driversResult.items.length);
       
       for (const mailNickname of uniqueDrivers) {
         // Find the driver by matching the mailNickname with the email prefix
-        const matchedDriver = drivers.find(driver => {
+        const matchedDriver = driversResult.items.find(driver => {
           if (!driver.mail) return false;
           const emailPrefix = driver.mail.split('@')[0].toLowerCase();
           return emailPrefix === mailNickname.toLowerCase();
@@ -371,10 +475,10 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'APPROVED':
         return 'bg-green-100 text-green-800 border-green-300';
-      case 'PENDING':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
       case 'REJECTED':
         return 'bg-red-100 text-red-800 border-red-300';
       default:
@@ -384,10 +488,10 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'APPROVED':
-        return '承認済み';
       case 'PENDING':
         return '承認待ち';
+      case 'APPROVED':
+        return '承認済み';
       case 'REJECTED':
         return '却下';
       default:
@@ -395,26 +499,24 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
     }
   };
 
-  // Function to determine actual driving status considering end registrations
+  // Helper function to determine actual driving status
   const getActualDrivingStatus = (submission: any) => {
-    // If this is an end registration, it's always ended
+    // Check if there's a related end submission
+    if (submission.registrationType === '運転開始登録' || submission.registrationType === '中間点呼登録') {
+      // Look for end submission with this as related ID
+      const hasEndSubmission = allSubmissions.some(sub => 
+        sub.registrationType === '運転終了登録' && 
+        sub.relatedSubmissionId === submission.id
+      );
+      
+      return hasEndSubmission ? '運転終了' : '運転中';
+    }
+    
+    // For end registrations, always show as completed
     if (submission.registrationType === '運転終了登録') {
       return '運転終了';
     }
-
-    // For start and middle registrations, check if there's a corresponding end registration
-    if (submission.registrationType === '運転開始登録' || submission.registrationType === '中間点呼登録') {
-      // Check if any end registration references this submission
-      const hasEndRegistration = allSubmissions.some(endSubmission => 
-        endSubmission.registrationType === '運転終了登録' && 
-        endSubmission.relatedSubmissionId === submission.id &&
-        endSubmission.approvalStatus === 'APPROVED'
-      );
-      
-      return hasEndRegistration ? '運転終了' : '運転中';
-    }
-
-    // Fallback to original status
+    
     return submission.drivingStatus || '運転中';
   };
 
@@ -451,7 +553,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   
-  const currentSubmissions = viewMode === 'individual' 
+  const currentDisplaySubmissions = viewMode === 'individual' 
     ? filteredSubmissions
         .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
         .slice(startIndex, endIndex)
@@ -496,12 +598,14 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
                 </>
               ) : (
                 <>
-                  全申請: {filteredSubmissions.length}件 | 
+                  表示中: {filteredSubmissions.length}件 | 
                   承認済み: {filteredSubmissions.filter(s => s.approvalStatus === 'APPROVED').length}件 | 
                   承認待ち: {filteredSubmissions.filter(s => s.approvalStatus === 'PENDING').length}件
                 </>
               )} |
+              読み込み済み: {totalLoaded}件 |
               あなたの役職: {user?.position || '一般'} (レベル{user?.jobLevel || 1})
+              {isLoading && <span className="ml-2 text-yellow-200">🔄 データ読み込み中...</span>}
             </p>
           </div>
           {onBack && (
@@ -591,7 +695,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
               </div>
             </div>
             
-            {/* Second Row - Date Filters */}
+            {/* Second Row - Date Filters and Actions */}
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -617,6 +721,18 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
               </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  🔍 検索実行
+                </label>
+                <button
+                  onClick={handleApplyFilters}
+                  disabled={isLoading}
+                  className="w-full p-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md transition-colors"
+                >
+                  {isLoading ? '読み込み中...' : 'フィルター適用'}
+                </button>
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   🗑️ リセット
                 </label>
                 <button
@@ -626,30 +742,62 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
                     setSearchTerm('');
                     setStatusFilter('all');
                     setSearchBy('all');
+                    loadInitialSubmissions();
                   }}
-                  className="w-full p-3 bg-gray-500 hover:bg-gray-600 text-white rounded-md transition-colors"
+                  disabled={isLoading}
+                  className="w-full p-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-md transition-colors"
                 >
-                  フィルターをクリア
+                  クリア & リロード
                 </button>
               </div>
             </div>
           </div>
-          <div className="mt-4 text-sm text-gray-600">
-            <span className="font-medium">検索結果:</span> 
-            {viewMode === 'grouped' ? (
-              <>
-                {filteredGroups.length} グループ 
-                {(searchTerm || dateFrom || dateTo) && <span className="ml-2">（全 {submissionGroups.length} グループ中）</span>}
-              </>
-            ) : (
-              <>
-                {filteredSubmissions.length} 件 
-                {(searchTerm || dateFrom || dateTo) && <span className="ml-2">（全 {allSubmissions.length} 件中）</span>}
-              </>
-            )}
+          {/* Pagination Status and Data Info */}
+          <div className="mt-4 bg-gray-50 rounded-lg p-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">データ状況:</span> 
+                <span className="ml-2">
+                  読み込み済み: <span className="font-semibold text-green-600">{totalLoaded}件</span>
+                  {hasMore && <span className="text-blue-600 ml-1">(さらに読み込み可能)</span>}
+                </span>
+                {viewMode === 'grouped' ? (
+                  <div className="mt-1">
+                    表示中: {filteredGroups.length} グループ
+                    {(searchTerm || dateFrom || dateTo) && <span className="ml-2">（検索結果）</span>}
+                  </div>
+                ) : (
+                  <div className="mt-1">
+                    表示中: {filteredSubmissions.length} 件
+                    {(searchTerm || dateFrom || dateTo) && <span className="ml-2">（検索結果）</span>}
+                  </div>
+                )}
+              </div>
+              
+              {/* Load More Button */}
+              {hasMore && !searchTerm && !dateFrom && !dateTo && statusFilter === 'all' && (
+                <button
+                  onClick={loadMoreSubmissions}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-md transition-colors text-sm"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      読み込み中...
+                    </>
+                  ) : (
+                    <>
+                      📥 さらに読み込み
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            
             {/* Show active filters */}
             {(dateFrom || dateTo || searchTerm || statusFilter !== 'all') && (
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <span className="text-xs text-gray-500">アクティブフィルター:</span>
                 {statusFilter !== 'all' && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
@@ -701,7 +849,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
         {/* Submissions Cards */}
         <div className="space-y-4 mb-6">
-          {(viewMode === 'grouped' ? currentGroups.length === 0 : currentSubmissions.length === 0) ? (
+          {(viewMode === 'grouped' ? currentGroups.length === 0 : currentDisplaySubmissions.length === 0) ? (
             <div className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
               {(searchTerm || dateFrom || dateTo || statusFilter !== 'all') ? '検索条件に一致する申請がありません' : '申請がありません'}
             </div>
@@ -913,7 +1061,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
             ))
           ) : (
             // Original individual rendering
-            currentSubmissions.map((submission) => (
+            currentDisplaySubmissions.map((submission) => (
               <div key={submission.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                 {/* Card Header - Always Visible */}
                 <div 

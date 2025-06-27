@@ -1,4 +1,5 @@
 import { Configuration, PopupRequest, LogLevel } from '@azure/msal-browser';
+import { logger } from '../utils/logger';
 
 // Azure AD Configuration
 export const msalConfig: Configuration = {
@@ -21,10 +22,10 @@ export const msalConfig: Configuration = {
         // Only log errors and warnings to reduce sensitive information exposure
         switch (level) {
           case LogLevel.Error:
-            console.error(message);
+            logger.error(message);
             return;
           case LogLevel.Warning:
-            console.warn(message);
+            logger.warn(message);
             return;
           case LogLevel.Info:
           case LogLevel.Verbose:

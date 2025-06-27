@@ -23,6 +23,7 @@ import './App.css';
 
 // Import pagination helpers
 import { getAllDrivers, getAllSubmissions } from './utils/paginationHelper';
+import { logger } from './utils/logger';
 
 // Configure client to use API key for public access
 const client = generateClient<Schema>({
@@ -201,10 +202,10 @@ function App({ user = null }: AppProps) {
                  (inputNickname && driver.mail.split('@')[0].toLowerCase() === inputNickname);
         });
 
-        console.log('Driver admin status determined');
+        logger.debug('Driver admin status determined');
         setUserFullAdminStatus(matchedDriver?.fullAdmin || false);
       } catch (error) {
-        console.error('Failed to check user fullAdmin status:', error);
+        logger.error('Failed to check user fullAdmin status:', error);
         setUserFullAdminStatus(false);
       }
     };
@@ -220,7 +221,7 @@ function App({ user = null }: AppProps) {
   
   // Debug logging for permissions - wrapped in useEffect to prevent infinite loops
   useEffect(() => {
-    console.log('Permission check completed');
+    logger.debug('Permission check completed');
   }, [user, userFullAdminStatus, isFullAdmin, isManager, isAnyAdmin]);
   
   // TEMPORARY: Override user role for testing - give tts_admin1@teral365.onmicrosoft.com SafeDrivingManager access
@@ -243,31 +244,31 @@ function App({ user = null }: AppProps) {
       // });
       // setVehicles(result.data);
     } catch (error) {
-      console.error('Failed to load vehicles:', error);
+      logger.error('Failed to load vehicles:', error);
     }
   }, []);
 
   const loadAzureVehicles = useCallback(async () => {
     if (!user || !user.department) {
-      console.warn('User or department not available for loading Azure vehicles');
+      logger.warn('User or department not available for loading Azure vehicles');
       setAzureVehicles([]);
       return;
     }
 
     if (!graphService) {
-      console.warn('GraphService not available for loading Azure vehicles');
+      logger.warn('GraphService not available for loading Azure vehicles');
       setAzureVehicles([]);
       return;
     }
 
     try {
-      console.log('Loading Azure vehicles for user department');
+      logger.debug('Loading Azure vehicles for user department');
       const vehicleUsers = await graphService.getVehicleUsers(user.department);
       
-      console.log('Loaded Azure vehicles successfully');
+      logger.debug('Loaded Azure vehicles successfully');
       setAzureVehicles(vehicleUsers);
     } catch (error) {
-      console.error('Failed to load Azure vehicles:', error);
+      logger.error('Failed to load Azure vehicles:', error);
       // Fallback to empty array
       setAzureVehicles([]);
     }
@@ -287,7 +288,7 @@ function App({ user = null }: AppProps) {
       // Get user's job level from the hierarchy system
       const userJobLevel = user.jobLevel || 1;
       
-      console.log('Loading confirmers for user');
+      logger.debug('Loading confirmers for user');
 
       // For Lower-Level Employees (JobLevel < 4): Can only select higher-level confirmers
       if (userJobLevel < 4) {
@@ -397,14 +398,14 @@ function App({ user = null }: AppProps) {
     }
 
     try {
-      console.log('Validating driver registration for user');
+      logger.debug('Validating driver registration for user');
       
       // Get the logged-in user's email nickname
       const userNickname = user.mailNickname.toLowerCase();
       
       // Load all drivers and check for match using paginated query
       const driverList = await getAllDrivers({ excludeDeleted: true });
-      console.log('Loaded drivers for validation:', driverList.length);
+      logger.debug('Loaded drivers for validation:', driverList.length);
       
       // Check if any driver's email nickname matches the logged-in user
       const matchedDriver = driverList.find(driver => {
@@ -420,14 +421,14 @@ function App({ user = null }: AppProps) {
       if (matchedDriver) {
         setIsRegisteredDriver(true);
         setDriverValidationMessage('');
-        console.log('Driver validation successful');
+        logger.debug('Driver validation successful');
       } else {
         setIsRegisteredDriver(false);
         setDriverValidationMessage('登録されたドライバーではありません。情報システム部にお問い合わせください。');
-        console.log('Driver validation failed: No matching driver found');
+        logger.warn('Driver validation failed: No matching driver found');
       }
     } catch (error) {
-      console.error('Driver validation error:', error);
+      logger.error('Driver validation error:', error);
       setIsRegisteredDriver(false);
       setDriverValidationMessage('ドライバー認証中にエラーが発生しました');
     }
@@ -435,7 +436,7 @@ function App({ user = null }: AppProps) {
 
   const checkUserWorkflowState = useCallback(async () => {
     if (!user || !user.mailNickname) {
-      console.log('🔍 No user or mailNickname, setting to initial state');
+      logger.debug('No user or mailNickname, setting to initial state');
       setCurrentWorkflowState('initial');
       setIsWorkflowLoading(false);
       return;
@@ -443,7 +444,7 @@ function App({ user = null }: AppProps) {
 
     try {
       setIsWorkflowLoading(true);
-      console.log('🔍 Checking workflow state for user');
+      logger.debug('Checking workflow state for user');
       
       // Get ALL submissions for the user using paginated query
       const allSubmissions = await getAllSubmissions({
@@ -451,10 +452,10 @@ function App({ user = null }: AppProps) {
         maxItems: 10000 // Reasonable limit for user's submissions
       });
       
-      console.log('🔍 Total submissions found:', allSubmissions.length);
+      logger.debug('Total submissions found:', allSubmissions.length);
 
       if (!allSubmissions || allSubmissions.length === 0) {
-        console.log('🔍 No submissions found, setting to initial state');
+        logger.debug('No submissions found, setting to initial state');
         setCurrentWorkflowState('initial');
         setIsWorkflowLoading(false);
         return;
@@ -466,13 +467,13 @@ function App({ user = null }: AppProps) {
       );
 
       const latestSubmission = sortedSubmissions[0];
-      console.log('🔍 Latest submission found');
-      console.log('🔍 Registration type:', latestSubmission.registrationType);
-      console.log('🔍 Approval status:', latestSubmission.approvalStatus);
+      logger.debug('Latest submission found');
+      logger.debug('Registration type:', latestSubmission.registrationType);
+      logger.debug('Approval status:', latestSubmission.approvalStatus);
 
       // Determine workflow state based on latest submission's approval status
       if (latestSubmission.approvalStatus === 'REJECTED') {
-        console.log('🔍 Latest submission was rejected, allowing resubmission of same type');
+        logger.debug('Latest submission was rejected, allowing resubmission of same type');
         // Allow resubmission of the same registration type
         if (latestSubmission.registrationType === '運転開始登録') {
           setCurrentWorkflowState('initial');
@@ -484,32 +485,32 @@ function App({ user = null }: AppProps) {
           setCurrentWorkflowState('initial');
         }
       } else if (latestSubmission.approvalStatus === 'PENDING' || latestSubmission.approvalStatus === 'APPROVED') {
-        console.log('🔍 Latest submission is approved/pending, continuing workflow');
+        logger.debug('Latest submission is approved/pending, continuing workflow');
         // Continue workflow normally based on approved submission
         if (latestSubmission.registrationType === '運転終了登録') {
-          console.log('🔍 Latest is end registration, setting to initial state');
+          logger.debug('Latest is end registration, setting to initial state');
           setCurrentWorkflowState('initial');
         } else if (latestSubmission.registrationType === '中間点呼登録') {
-          console.log('🔍 Latest is middle registration, checking trip progress');
+          logger.debug('Latest is middle registration, checking trip progress');
           
           const progress = await getTripProgress(latestSubmission.driverName || '');
           setTripProgress(progress);
           
           if (progress) {
-            console.log('🔍 Trip progress calculated');
+            logger.debug('Trip progress calculated');
             
             if (progress.isComplete) {
-              console.log('🔍 All intermediates completed, enabling end registration');
+              logger.debug('All intermediates completed, enabling end registration');
               setCurrentWorkflowState('needsEnd');
             } else if (progress.canDoIntermediate) {
-              console.log('🔍 Can do more intermediates');
+              logger.debug('Can do more intermediates');
               setCurrentWorkflowState('needsMiddle');
             } else {
-              console.log('🔍 Already did intermediate today, wait for tomorrow');
+              logger.debug('Already did intermediate today, wait for tomorrow');
               setCurrentWorkflowState('waitingForNextDay');
             }
           } else {
-            console.log('🔍 Could not get trip progress, defaulting to needsEnd');
+            logger.debug('Could not get trip progress, defaulting to needsEnd');
             setCurrentWorkflowState('needsEnd');
           }
         } else if (latestSubmission.registrationType === '運転開始登録') {
@@ -522,10 +523,10 @@ function App({ user = null }: AppProps) {
           const alightingDateOnly = new Date(alightingDate.getFullYear(), alightingDate.getMonth(), alightingDate.getDate());
           const daysDiff = Math.ceil((alightingDateOnly.getTime() - boardingDateOnly.getTime()) / (1000 * 3600 * 24)) + 1;
           
-          console.log('🔍 Trip duration analysis:');
-          console.log('🔍 Boarding date:', boardingDate.toDateString());
-          console.log('🔍 Alighting date:', alightingDate.toDateString());
-          console.log('🔍 Days difference:', daysDiff);
+          logger.debug('Trip duration analysis:');
+          logger.debug('Boarding date:', boardingDate.toDateString());
+          logger.debug('Alighting date:', alightingDate.toDateString());
+          logger.debug('Days difference:', daysDiff);
           
           // Intermediate roll calls are required for trips of 3+ calendar days (2+ nights)
           // Examples:
@@ -534,7 +535,7 @@ function App({ user = null }: AppProps) {
           // - 5/26～5/28 (2 nights, 3 calendar days): 2 intermediates needed on 27th and 28th
           // - 5/26～5/30 (4 nights, 5 calendar days): 4 intermediates needed on 27th, 28th, 29th, and 30th
           if (daysDiff >= 3) {
-            console.log('🔍 Trip is 3+ calendar days (2+ nights), intermediate roll calls required');
+            logger.debug('Trip is 3+ calendar days (2+ nights), intermediate roll calls required');
             
             // Get trip progress for this driver
             const progress = await getTripProgress(latestSubmission.driverName || '');
@@ -548,22 +549,22 @@ function App({ user = null }: AppProps) {
               setCurrentWorkflowState('needsMiddle');
             }
           } else {
-            console.log('🔍 Trip is 1-2 calendar days (same day or 1 night), no intermediate roll calls needed');
+            logger.debug('Trip is 1-2 calendar days (same day or 1 night), no intermediate roll calls needed');
             setCurrentWorkflowState('needsEnd');
           }
         } else {
-          console.log('🔍 Unknown registration type, setting to initial state');
+          logger.debug('Unknown registration type, setting to initial state');
           setCurrentWorkflowState('initial');
         }
       } else {
-        console.log('🔍 Unknown approval status, setting to initial state');
+        logger.debug('Unknown approval status, setting to initial state');
         setCurrentWorkflowState('initial');
       }
 
-      console.log('🔍 Workflow state determined');
+      logger.debug('Workflow state determined');
       setIsWorkflowLoading(false);
     } catch (error) {
-      console.error('🔍 Error checking workflow state:', error);
+      logger.error('Error checking workflow state:', error);
       setCurrentWorkflowState('initial');
       setIsWorkflowLoading(false);
     }
@@ -600,7 +601,7 @@ function App({ user = null }: AppProps) {
                         user.displayName?.replace(/\s+/g, '.').toLowerCase() ||
                         'unknown-user';
       
-      console.log('Auto-setting driver name from user data - driver set successfully');
+      logger.debug('Auto-setting driver name from user data - driver set successfully');
       
       setFormData(prev => ({ 
         ...prev, 
@@ -685,7 +686,7 @@ function App({ user = null }: AppProps) {
         isComplete: remainingIntermediates <= 0
       };
     } catch (error) {
-      console.error('Error getting trip progress:', error);
+      logger.error('Error getting trip progress:', error);
       return null;
     }
   }, []);
@@ -700,7 +701,7 @@ function App({ user = null }: AppProps) {
   // Load confirmers when user changes (removed driver name dependency to prevent infinite loop)
   useEffect(() => {
     if (user) {
-      console.log('User available, loading confirmers');
+      logger.debug('User available, loading confirmers');
       loadAvailableConfirmers();
     }
   }, [user, loadAvailableConfirmers]);
@@ -737,11 +738,11 @@ function App({ user = null }: AppProps) {
     selectedConfirmer: any
   ) => {
     try {
-      console.log('Sending Teams notification...');
+      logger.debug('Sending Teams notification...');
       
       // Check if GraphService is available
       if (!graphService) {
-        console.warn('GraphService not available for Teams notification');
+        logger.warn('GraphService not available for Teams notification');
         return;
       }
       
@@ -763,10 +764,10 @@ function App({ user = null }: AppProps) {
           throw new Error('Invalid access token received');
         }
         
-        console.log('✅ Successfully obtained and validated Microsoft Graph access token');
+        logger.debug('Successfully obtained and validated Microsoft Graph access token');
       } catch (tokenError) {
-        console.error('Failed to get Microsoft Graph access token:', tokenError);
-        console.warn('Teams notification will not be sent due to missing access token');
+        logger.error('Failed to get Microsoft Graph access token:', tokenError);
+        logger.warn('Teams notification will not be sent due to missing access token');
         return;
       }
 

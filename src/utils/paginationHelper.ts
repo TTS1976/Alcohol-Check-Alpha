@@ -5,6 +5,7 @@
 
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { logger } from './logger';
 
 const client = generateClient<Schema>({
   authMode: 'apiKey'
@@ -16,8 +17,133 @@ export interface PaginatedListOptions {
   maxItems?: number; // Optional limit on total items to prevent runaway queries
 }
 
+export interface ServerPaginationOptions {
+  filter?: any;
+  limit?: number;
+  nextToken?: string;
+  sortDirection?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  nextToken?: string;
+  hasMore: boolean;
+  totalCount?: number;
+}
+
+/**
+ * NEW: Server-side pagination function that loads data in chunks
+ * Use this instead of getAllItems for better performance
+ */
+export async function getItemsPaginated<T>(
+  modelName: keyof Schema,
+  options: ServerPaginationOptions = {}
+): Promise<PaginatedResult<T>> {
+  const { filter, limit = 50, nextToken, sortDirection = 'DESC' } = options;
+  
+  logger.debug(`Loading paginated ${String(modelName)} (limit: ${limit})`);
+  
+  try {
+    const queryOptions: any = {
+      limit,
+      sortDirection
+    };
+    
+    if (filter) {
+      queryOptions.filter = filter;
+    }
+    
+    if (nextToken) {
+      queryOptions.nextToken = nextToken;
+    }
+    
+    // Use dynamic model access
+    const result = await (client.models as any)[modelName].list(queryOptions);
+    
+    if (!result.data) {
+      logger.warn(`No data returned for ${String(modelName)}`);
+      return {
+        items: [],
+        hasMore: false
+      };
+    }
+
+    const items = result.data as T[];
+    logger.debug(`Loaded ${items.length} ${String(modelName)} items`);
+    
+    return {
+      items,
+      nextToken: result.nextToken,
+      hasMore: !!result.nextToken
+    };
+    
+  } catch (error) {
+    logger.error(`Error in paginated query for ${String(modelName)}:`, error);
+    throw new Error(`Failed to load ${String(modelName)} items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * NEW: Specialized function for submissions with server-side pagination
+ */
+export async function getSubmissionsPaginated(options: {
+  approvalStatus?: string;
+  registrationType?: string;
+  submittedBy?: string;
+  limit?: number;
+  nextToken?: string;
+  excludeRejected?: boolean;
+} = {}): Promise<PaginatedResult<Schema["AlcoholCheckSubmission"]["type"]>> {
+  const { approvalStatus, registrationType, submittedBy, limit = 50, nextToken, excludeRejected } = options;
+  
+  let filter: any = {};
+  
+  if (approvalStatus) {
+    filter.approvalStatus = { eq: approvalStatus };
+  }
+  
+  if (registrationType) {
+    filter.registrationType = { eq: registrationType };
+  }
+  
+  if (submittedBy) {
+    filter.submittedBy = { eq: submittedBy };
+  }
+  
+  if (excludeRejected) {
+    filter.approvalStatus = { ne: 'REJECTED' };
+  }
+  
+  return getItemsPaginated<Schema["AlcoholCheckSubmission"]["type"]>('AlcoholCheckSubmission', {
+    filter: Object.keys(filter).length > 0 ? filter : undefined,
+    limit,
+    nextToken
+  });
+}
+
+/**
+ * NEW: Specialized function for drivers with server-side pagination
+ */
+export async function getDriversPaginated(options: {
+  excludeDeleted?: boolean;
+  limit?: number;
+  nextToken?: string;
+} = {}): Promise<PaginatedResult<Schema["Driver"]["type"]>> {
+  const { excludeDeleted = true, limit = 50, nextToken } = options;
+  
+  const filter = excludeDeleted ? { isDeleted: { eq: false } } : undefined;
+  
+  return getItemsPaginated<Schema["Driver"]["type"]>('Driver', {
+    filter,
+    limit,
+    nextToken
+  });
+}
+
+// Keep existing functions for backward compatibility but add warnings
 /**
  * Generic paginated list function that retrieves ALL items from a model
+ * @deprecated Use getItemsPaginated instead for better performance
  * @param modelName - The name of the model to query (e.g., 'Driver', 'AlcoholCheckSubmission')
  * @param options - Query options including filters
  * @returns Promise<Array> - All items matching the criteria
@@ -26,9 +152,11 @@ export async function getAllItems<T>(
   modelName: keyof Schema,
   options: PaginatedListOptions = {}
 ): Promise<T[]> {
+  logger.warn(`getAllItems is deprecated. Consider using getItemsPaginated for better performance.`);
+  
   const { filter, limit = 1000, maxItems = 50000 } = options;
   
-  console.log(`📄 Starting paginated query for ${String(modelName)}...`);
+  logger.debug(`Starting paginated query for ${String(modelName)}...`);
   
   let allItems: T[] = [];
   let nextToken: string | undefined = undefined;
@@ -38,7 +166,7 @@ export async function getAllItems<T>(
   try {
     do {
       pageCount++;
-      console.log(`📄 Loading page ${pageCount} for ${String(modelName)}...`);
+      logger.debug(`Loading page ${pageCount} for ${String(modelName)}...`);
       
       const queryOptions: any = {
         limit: Math.min(limit, maxItems - totalFetched), // Respect maxItems limit
@@ -56,7 +184,7 @@ export async function getAllItems<T>(
       const result = await (client.models as any)[modelName].list(queryOptions);
       
       if (!result.data) {
-        console.warn(`No data returned for ${String(modelName)} page ${pageCount}`);
+        logger.warn(`No data returned for ${String(modelName)} page ${pageCount}`);
         break;
       }
 
@@ -65,33 +193,34 @@ export async function getAllItems<T>(
       totalFetched += pageItems.length;
       nextToken = result.nextToken || undefined;
       
-      console.log(`✅ Page ${pageCount}: Loaded ${pageItems.length} ${String(modelName)} items (Total so far: ${allItems.length})`);
+      logger.debug(`Page ${pageCount}: Loaded ${pageItems.length} ${String(modelName)} items (Total so far: ${allItems.length})`);
       
       // Safety check to prevent runaway queries
       if (totalFetched >= maxItems) {
-        console.warn(`🛑 Reached maximum items limit (${maxItems}) for ${String(modelName)}`);
+        logger.warn(`Reached maximum items limit (${maxItems}) for ${String(modelName)}`);
         break;
       }
       
       // Another safety check for reasonable page limits
       if (pageCount > 500) {
-        console.error(`🛑 Excessive pagination detected for ${String(modelName)} (${pageCount} pages). Stopping to prevent runaway query.`);
+        logger.error(`Excessive pagination detected for ${String(modelName)} (${pageCount} pages). Stopping to prevent runaway query.`);
         break;
       }
       
     } while (nextToken);
 
-    console.log(`🎯 Finished loading all ${String(modelName)} items. Total: ${allItems.length} items across ${pageCount} pages`);
+    logger.info(`Finished loading all ${String(modelName)} items. Total: ${allItems.length} items across ${pageCount} pages`);
     return allItems;
     
   } catch (error) {
-    console.error(`❌ Error in paginated query for ${String(modelName)}:`, error);
+    logger.error(`Error in paginated query for ${String(modelName)}:`, error);
     throw new Error(`Failed to load ${String(modelName)} items: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
  * Specialized function for AlcoholCheckSubmission queries with common filters
+ * @deprecated Use getSubmissionsPaginated instead for better performance
  */
 export async function getAllSubmissions(options: {
   submittedBy?: string;
@@ -101,6 +230,8 @@ export async function getAllSubmissions(options: {
   excludeRejected?: boolean;
   maxItems?: number;
 } = {}): Promise<Schema["AlcoholCheckSubmission"]["type"][]> {
+  logger.warn(`getAllSubmissions is deprecated. Consider using getSubmissionsPaginated for better performance.`);
+  
   const { submittedBy, registrationType, approvalStatus, relatedSubmissionId, excludeRejected, maxItems } = options;
   
   let filter: any = {};
@@ -133,11 +264,14 @@ export async function getAllSubmissions(options: {
 
 /**
  * Specialized function for Driver queries
+ * @deprecated Use getDriversPaginated instead for better performance
  */
 export async function getAllDrivers(options: {
   excludeDeleted?: boolean;
   maxItems?: number;
 } = {}): Promise<Schema["Driver"]["type"][]> {
+  logger.warn(`getAllDrivers is deprecated. Consider using getDriversPaginated for better performance.`);
+  
   const { excludeDeleted = true, maxItems } = options;
   
   const filter = excludeDeleted ? { isDeleted: { eq: false } } : undefined;
@@ -150,6 +284,7 @@ export async function getAllDrivers(options: {
 
 /**
  * Get submissions with safe pagination and sorting
+ * @deprecated Use getSubmissionsPaginated instead for better performance
  */
 export async function getSubmissionsSorted(options: {
   submittedBy?: string;
@@ -157,6 +292,8 @@ export async function getSubmissionsSorted(options: {
   sortOrder?: 'asc' | 'desc';
   maxItems?: number;
 } = {}): Promise<Schema["AlcoholCheckSubmission"]["type"][]> {
+  logger.warn(`getSubmissionsSorted is deprecated. Consider using getSubmissionsPaginated for better performance.`);
+  
   const { submittedBy, sortBy = 'submittedAt', sortOrder = 'desc', maxItems } = options;
   
   const submissions = await getAllSubmissions({ submittedBy, maxItems });
