@@ -1385,8 +1385,8 @@ function App({ user = null }: AppProps) {
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-6 mb-8 transform hover:scale-[1.01] transition-all duration-300">
                           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
                 <div className="space-y-2">
-                  <h1 className="text-2xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
-                    <img src={teralSafetyIcon} alt="Teral Safety" className="w-8 h-8 lg:w-10 lg:h-10" />
+                  <h1 className="text-xl lg:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
+                    <img src={teralSafetyIcon} alt="Teral Safety" className="w-14 h-15 lg:w-20 lg:h-15" />
                     TTSグループ運行管理システム
                   </h1>
                 <div className="flex flex-col gap-1 text-sm text-gray-600">
