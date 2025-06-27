@@ -1235,30 +1235,30 @@ function App({ user = null }: AppProps) {
 
   // Check if entire form is valid (driver name auto-populated from Azure AD, confirmer selection required)
   // Image upload is now required again for form submission
-  // const isFormValid = (registrationType === 'end' || registrationType === 'middle')
-  //   ? formData.inspectionResultEnd.trim() !== '' &&
-  //     formData.selectedConfirmer.trim() !== '' &&
-  //     isInspectionResultValid(formData.inspectionResultEnd) &&
-  //     isImageUploaded
-  //   : isVehicleFormValid &&
-  //     isSafetyFormValid &&
-  //     formData.inspectionResult.trim() !== '' &&
-  //     formData.selectedConfirmer.trim() !== '' &&
-  //     isInspectionResultValid(formData.inspectionResult) &&
-  //     isImageUploaded;
+  const isFormValid = (registrationType === 'end' || registrationType === 'middle')
+    ? formData.inspectionResultEnd.trim() !== '' &&
+      formData.selectedConfirmer.trim() !== '' &&
+      isInspectionResultValid(formData.inspectionResultEnd) &&
+      isImageUploaded
+    : isVehicleFormValid &&
+      isSafetyFormValid &&
+      formData.inspectionResult.trim() !== '' &&
+      formData.selectedConfirmer.trim() !== '' &&
+      isInspectionResultValid(formData.inspectionResult) &&
+      isImageUploaded;
 
   // Disable picture requirement
-  const isFormValid = (registrationType === 'end' || registrationType === 'middle')
-  ? formData.inspectionResultEnd.trim() !== '' &&
-    formData.selectedConfirmer.trim() !== '' &&
-    isInspectionResultValid(formData.inspectionResultEnd)
-    // && isImageUploaded  // DISABLED FOR TESTING
-  : isVehicleFormValid &&
-    isSafetyFormValid &&
-    formData.inspectionResult.trim() !== '' &&
-    formData.selectedConfirmer.trim() !== '' &&
-    isInspectionResultValid(formData.inspectionResult);
-    // && isImageUploaded;  // DISABLED FOR TESTING
+  // const isFormValid = (registrationType === 'end' || registrationType === 'middle')
+  // ? formData.inspectionResultEnd.trim() !== '' &&
+  //   formData.selectedConfirmer.trim() !== '' &&
+  //   isInspectionResultValid(formData.inspectionResultEnd)
+  //   // && isImageUploaded  // DISABLED FOR TESTING
+  // : isVehicleFormValid &&
+  //   isSafetyFormValid &&
+  //   formData.inspectionResult.trim() !== '' &&
+  //   formData.selectedConfirmer.trim() !== '' &&
+  //   isInspectionResultValid(formData.inspectionResult);
+  //   // && isImageUploaded;  // DISABLED FOR TESTING
 
   // Add function to check if expiration date is within 3 months
   const isExpirationSoon = (expirationDate: string): boolean => {
