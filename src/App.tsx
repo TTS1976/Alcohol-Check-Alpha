@@ -123,6 +123,10 @@ function App({ user = null }: AppProps) {
   const [isRegisteredDriver, setIsRegisteredDriver] = useState<boolean | null>(null); // null = checking, true = registered, false = not registered
   const [driverValidationMessage, setDriverValidationMessage] = useState<string>('');
   
+  // License expiration states
+  const [licenseExpirationStatus, setLicenseExpirationStatus] = useState<'valid' | 'expiring_soon' | 'expired' | null>(null);
+  const [licenseExpirationDate, setLicenseExpirationDate] = useState<string>('');
+  
   // Workflow state management
   const [currentWorkflowState, setCurrentWorkflowState] = useState<'initial' | 'needsMiddle' | 'needsEnd' | 'completed' | 'waitingForNextDay'>('initial');
   const [isWorkflowLoading, setIsWorkflowLoading] = useState(true);
@@ -421,10 +425,19 @@ function App({ user = null }: AppProps) {
       if (matchedDriver) {
         setIsRegisteredDriver(true);
         setDriverValidationMessage('');
+        
+        // Check license expiration status
+        const expirationStatus = checkLicenseExpirationStatus(matchedDriver.expirationDate);
+        setLicenseExpirationStatus(expirationStatus);
+        setLicenseExpirationDate(matchedDriver.expirationDate);
+        
         logger.debug('Driver validation successful');
+        logger.debug('License expiration status:', expirationStatus);
       } else {
         setIsRegisteredDriver(false);
         setDriverValidationMessage('登録されたドライバーではありません。情報システム部にお問い合わせください。');
+        setLicenseExpirationStatus(null);
+        setLicenseExpirationDate('');
         logger.warn('Driver validation failed: No matching driver found');
       }
     } catch (error) {
@@ -1270,6 +1283,24 @@ function App({ user = null }: AppProps) {
     return expDate <= threeMonthsFromNow;
   };
 
+  // Add function to check license expiration status (2 months for warning instead of 3)
+  const checkLicenseExpirationStatus = (expirationDate: string): 'valid' | 'expiring_soon' | 'expired' => {
+    if (!expirationDate) return 'valid';
+    
+    const expDate = new Date(expirationDate);
+    const currentDate = new Date();
+    const twoMonthsFromNow = new Date();
+    twoMonthsFromNow.setMonth(currentDate.getMonth() + 2);
+    
+    if (expDate <= currentDate) {
+      return 'expired';
+    } else if (expDate <= twoMonthsFromNow) {
+      return 'expiring_soon';
+    } else {
+      return 'valid';
+    }
+  };
+
   // Function to handle registration type selection
   const handleRegistrationTypeSelect = (type: 'start' | 'middle' | 'end' | 'manual') => {
     // Only allow selection if the button is enabled
@@ -1278,8 +1309,8 @@ function App({ user = null }: AppProps) {
     if (type === 'end' && !isEndButtonEnabled()) return;
     
     if (type === 'manual') {
-      // Manual registration is always available to registered drivers
-      if (isRegisteredDriver !== true) return;
+      // Manual registration is available to registered drivers with valid licenses
+      if (isRegisteredDriver !== true || licenseExpirationStatus === 'expired') return;
       setShowManualForm(true);
       return;
     }
@@ -1348,17 +1379,26 @@ function App({ user = null }: AppProps) {
     }
   };
 
-  // Helper functions to determine button availability based on workflow state
+  // Helper functions to determine button availability based on workflow state and license expiration
   const isStartButtonEnabled = () => {
-    return isRegisteredDriver === true && currentWorkflowState === 'initial' && !isWorkflowLoading;
+    return isRegisteredDriver === true && 
+           currentWorkflowState === 'initial' && 
+           !isWorkflowLoading && 
+           licenseExpirationStatus !== 'expired';
   };
 
   const isMiddleButtonEnabled = () => {
-    return isRegisteredDriver === true && currentWorkflowState === 'needsMiddle' && !isWorkflowLoading;
+    return isRegisteredDriver === true && 
+           currentWorkflowState === 'needsMiddle' && 
+           !isWorkflowLoading && 
+           licenseExpirationStatus !== 'expired';
   };
 
   const isEndButtonEnabled = () => {
-    return isRegisteredDriver === true && currentWorkflowState === 'needsEnd' && !isWorkflowLoading;
+    return isRegisteredDriver === true && 
+           currentWorkflowState === 'needsEnd' && 
+           !isWorkflowLoading && 
+           licenseExpirationStatus !== 'expired';
   };
 
   const getButtonClassName = (isEnabled: boolean) => {
@@ -1628,6 +1668,50 @@ function App({ user = null }: AppProps) {
                       </div>
                     </div>
                     
+                    {/* License Expiration Status */}
+                    {licenseExpirationStatus === 'expired' && (
+                      <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">❌</span>
+                          <div>
+                            <p className="font-semibold">
+                              免許証が期限切れです
+                            </p>
+                            <p className="text-center">
+                              免許証の有効期限が切れているため、すべての登録フォームは利用できません。<br/>
+                              更新後、「免許証更新」ボタンから更新手続きを行ってください。
+                            </p>
+                            {licenseExpirationDate && (
+                              <p className="text-xs mt-1">
+                                有効期限: {new Date(licenseExpirationDate).toLocaleDateString('ja-JP')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {licenseExpirationStatus === 'expiring_soon' && (
+                      <div className="bg-yellow-100 border border-yellow-300 text-yellow-700 px-4 py-3 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">⚠️</span>
+                          <div>
+                            <p className="font-semibold">
+                              免許証の有効期限が間もなく切れます
+                            </p>
+                            <p className="text-center">
+                              更新後は、「免許証更新」ボタンから更新手続きを行ってください。有効期限が切れた場合は、登録できませんのでご注意ください。
+                            </p>
+                            {licenseExpirationDate && (
+                              <p className="text-xs mt-1">
+                                有効期限: {new Date(licenseExpirationDate).toLocaleDateString('ja-JP')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Trip Progress Display */}
                     {tripProgress && (currentWorkflowState === 'needsMiddle' || currentWorkflowState === 'needsEnd' || currentWorkflowState === 'waitingForNextDay') && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1787,8 +1871,8 @@ function App({ user = null }: AppProps) {
 
                 {/* Manual Registration Card */}
                 <div 
-                  onClick={() => isRegisteredDriver === true && handleRegistrationTypeSelect('manual')}
-                  className={getButtonClassName(isRegisteredDriver === true)}
+                  onClick={() => isRegisteredDriver === true && licenseExpirationStatus !== 'expired' && handleRegistrationTypeSelect('manual')}
+                  className={getButtonClassName(isRegisteredDriver === true && licenseExpirationStatus !== 'expired')}
                 >
                   <div className="relative bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-8 shadow-2xl hover:shadow-3xl transition-all duration-300 overflow-hidden h-full">
                     {/* Background Pattern */}
