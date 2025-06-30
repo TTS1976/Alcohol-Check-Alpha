@@ -40,7 +40,7 @@
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 10px;
-  min-height: 300px; /* Ensure there's space for the video even before it loads */
+  min-height: 260px; /* Ensure there's space for the video even before it loads */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -154,6 +154,56 @@
   border-radius: 8px;
   border: 2px solid #ddd;
   transition: border-color 0.3s ease;
+}
+
+/* No Mask Icon Styles */
+.no-mask-icon {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: rgba(220, 53, 69, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  animation: noMaskPulse 2s ease-in-out infinite;
+}
+
+.mask-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mask-icon svg {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.mask-text {
+  white-space: nowrap;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes noMaskPulse {
+  0%, 100% { 
+    transform: scale(1);
+    background-color: rgba(220, 53, 69, 0.9);
+  }
+  50% { 
+    transform: scale(1.05);
+    background-color: rgba(220, 53, 69, 1);
+  }
 }
 
 /* Mini status indicator on video */
