@@ -11,6 +11,7 @@ interface FaceOrientationData {
   isFacingForward: boolean;
   confidence: number;
   message: string;
+  isMasked: boolean;
 }
 
 const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = false }) => {
@@ -21,7 +22,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
   const [faceOrientation, setFaceOrientation] = useState<FaceOrientationData>({
     isFacingForward: false,
     confidence: 0,
-    message: 'カメラの前に正面を向いてください'
+    message: 'カメラの前に正面を向いてください',
+    isMasked: false,
   });
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   
@@ -81,18 +83,23 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     const video = videoRef.current;
 
     try {
-      // Detect face with strict settings
+      // Detect face with very strict settings for capture
       const detection = await faceapi
         .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ 
-          inputSize: 320,
-          scoreThreshold: 0.7 // Very strict threshold
+          inputSize: 416, // Higher resolution for better accuracy
+          scoreThreshold: 0.8 // Even more strict threshold for capture
         }))
         .withFaceLandmarks();
 
       if (detection) {
         const orientation = analyzeStrictFaceOrientation(detection, video.videoWidth, video.videoHeight);
         
-        console.log('Face analysis completed:', orientation.isFacingForward ? 'Forward facing' : 'Not forward facing');
+        console.log('Face analysis completed:', {
+          isFacingForward: orientation.isFacingForward,
+          isMasked: orientation.isMasked,
+          confidence: orientation.confidence,
+          message: orientation.message
+        });
         
         return orientation.isFacingForward;
       } else {
@@ -112,8 +119,48 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     
     // Get key facial points
     const nose = landmarks.getNose();
+    const mouth = landmarks.getMouth();
     const leftEye = landmarks.getLeftEye();
     const rightEye = landmarks.getRightEye();
+    const jaw = landmarks.getJawOutline();
+
+    // Enhanced mouth visibility check
+    const noseTip = nose[3]; // Bottom of nose
+    const mouthTop = mouth[3]; // Top lip center
+    const mouthBottom = mouth[9]; // Bottom lip center
+    const mouthLeft = mouth[0]; // Left corner
+    const mouthRight = mouth[6]; // Right corner
+    
+    // Calculate mouth dimensions
+    const mouthHeight = Math.abs(mouthBottom.y - mouthTop.y);
+    const mouthWidth = Math.abs(mouthRight.x - mouthLeft.x);
+    const noseToMouthDistance = Math.abs(mouthTop.y - noseTip.y);
+    
+    // Expected proportions for a clearly visible mouth
+    const expectedNoseToMouthRatio = 0.3; // Mouth should be about 30% of nose-to-chin distance
+    const chinPoint = jaw[8]; // Bottom of chin
+    const noseToChinDistance = Math.abs(chinPoint.y - noseTip.y);
+    const expectedMouthHeight = noseToChinDistance * 0.15; // Mouth should be at least 15% of nose-to-chin
+    const expectedMouthWidth = faceBox.width * 0.2; // Mouth should be at least 20% of face width
+    
+    // Strict mouth visibility checks
+    const isMouthHeightAdequate = mouthHeight >= expectedMouthHeight;
+    const isMouthWidthAdequate = mouthWidth >= expectedMouthWidth;
+    const isNoseToMouthDistanceNormal = noseToMouthDistance >= (noseToChinDistance * expectedNoseToMouthRatio);
+    
+    // Check if mouth landmarks are properly distributed (not clustered due to occlusion)
+    const mouthLandmarkSpread = Math.max(
+      Math.abs(mouthRight.x - mouthLeft.x),
+      Math.abs(mouthBottom.y - mouthTop.y)
+    );
+    const isNotOccluded = mouthLandmarkSpread > (faceBox.width * 0.15);
+    
+    // Check for hand/object covering mouth area
+    // If mouth landmarks are detected but dimensions are too small, likely covered
+    const isMouthVisible = isMouthHeightAdequate && isMouthWidthAdequate && 
+                          isNoseToMouthDistanceNormal && isNotOccluded;
+    
+    const isMasked = !isMouthVisible;
     
     // Calculate face center
     const faceCenter = {
@@ -122,7 +169,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     };
     
     // Get nose tip (center point of nose)
-    const noseTip = nose[3];
     
     // Calculate horizontal offset of nose from face center
     const noseOffset = Math.abs(noseTip.x - faceCenter.x);
@@ -164,12 +210,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     // Detection confidence from Face-api.js
     const detectionConfidence = detection.detection.score;
     
-    // More lenient thresholds for practical use
-    const NOSE_OFFSET_THRESHOLD = 0.2; // Moderately centered nose
-    const EYE_ALIGNMENT_THRESHOLD = 0.15; // Reasonably aligned eyes
-    const MIN_CONFIDENCE = 0.5; // Moderate confidence
-    const MIN_FACE_SIZE = 80; // Reasonable minimum face size
-    const MIN_EYE_DISTANCE = 25; // Minimum distance between eyes (front-facing)
+    // Strict thresholds for alcohol detection system
+    const NOSE_OFFSET_THRESHOLD = 0.15; // Very centered nose
+    const EYE_ALIGNMENT_THRESHOLD = 0.1; // Well aligned eyes
+    const MIN_CONFIDENCE = 0.7; // High confidence required
+    const MIN_FACE_SIZE = 100; // Larger minimum face size
+    const MIN_EYE_DISTANCE = 30; // Minimum distance between eyes (front-facing)
     
     // Conditions check
     const isNoseCentered = relativeNoseOffset < NOSE_OFFSET_THRESHOLD;
@@ -178,6 +224,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     const isBigEnough = faceWidth > MIN_FACE_SIZE;
     const hasGoodEyeDistance = eyeDistance > MIN_EYE_DISTANCE;
     const areEyesVisible = eyesVisibleInFrame;
+    const isMouthClearlyVisible = isMouthVisible; // New strict requirement
     
     // Overall confidence calculation
     let confidence = detectionConfidence;
@@ -185,23 +232,28 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     if (areEyesAligned) confidence += 0.1;
     if (hasGoodEyeDistance) confidence += 0.1;
     if (areEyesVisible) confidence += 0.1;
+    if (isMouthClearlyVisible) confidence += 0.15; // Higher weight for mouth visibility
     confidence = Math.min(confidence, 1.0);
     
-    // More practical decision - most conditions should be met
-    const criticalConditions = [isConfident, isBigEnough, areEyesVisible].filter(Boolean).length;
+    // STRICT decision - ALL critical conditions must be met
+    const criticalConditions = [isConfident, isBigEnough, areEyesVisible, isMouthClearlyVisible].filter(Boolean).length;
     const orientationConditions = [isNoseCentered, areEyesAligned, hasGoodEyeDistance].filter(Boolean).length;
     
-    // Need all critical conditions + at least 2 orientation conditions
-    const isFacingForward = criticalConditions === 3 && orientationConditions >= 2;
+    // Need ALL critical conditions (including mouth visibility) + ALL orientation conditions
+    const isFacingForward = criticalConditions === 4 && orientationConditions === 3;
     
-    // Generate message
+    // Generate message with priority order
     let message = '';
-    if (!isBigEnough) {
+    if (isMasked) {
+      message = '手、マスク、物などを取り除いてください';
+    } else if (!isBigEnough) {
       message = 'カメラに近づいてください';
     } else if (!isConfident) {
       message = '顔をもっとはっきりと映してください';
     } else if (!areEyesVisible) {
       message = '両目がはっきり見えるようにしてください';
+    } else if (!isMouthClearlyVisible) {
+      message = '口元がはっきり見えません';
     } else if (!hasGoodEyeDistance) {
       message = '正面を向いてください（横顔になっています）';
     } else if (!areEyesAligned) {
@@ -215,7 +267,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     return {
       isFacingForward,
       confidence,
-      message
+      message,
+      isMasked
     };
   };
 
@@ -252,7 +305,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
         setFaceOrientation({
           isFacingForward: false,
           confidence: 0,
-          message: '顔が検出されません'
+          message: '顔が検出されません',
+          isMasked: false
         });
         
         // Draw center guidelines when no face detected
@@ -263,7 +317,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
       setFaceOrientation({
         isFacingForward: false,
         confidence: 0,
-        message: '顔認識エラー'
+        message: '顔認識エラー',
+        isMasked: false
       });
       
       // Draw center guidelines on error
@@ -450,6 +505,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     // Check face orientation before capture
     const isFaceValid = await checkFaceForCapture();
     
+    if (faceOrientation.isMasked) {
+      alert('マスクを外してから撮影してください。');
+      return;
+    }
+
     if (!isFaceValid) {
       alert('正面を向いてから撮影してください。\n両目がはっきり見え、顔全体がカメラに映っている必要があります。');
       return;
@@ -483,7 +543,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     setFaceOrientation({
       isFacingForward: false,
       confidence: 0,
-      message: 'カメラの前に正面を向いてください'
+      message: 'カメラの前に正面を向いてください',
+      isMasked: false
     });
   };
 
@@ -549,8 +610,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
             />
             
             {isCameraOpen && (
-              <div className={`face-status-mini ${faceOrientation.isFacingForward ? 'status-ready' : 'status-waiting'}`}>
-                {faceOrientation.isFacingForward ? '✓ 撮影可能' : '⚠ 顔を確認中...'}
+              <div className={`face-status-mini ${faceOrientation.isFacingForward && !faceOrientation.isMasked ? 'status-ready' : 'status-waiting'}`}>
+                {faceOrientation.isFacingForward && !faceOrientation.isMasked ? '✓ 撮影可能' : faceOrientation.isMasked ? '⚠ マスクを外してください' : '⚠ 顔を確認中...'}
               </div>
             )}
           </div>
@@ -559,8 +620,8 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
           {isCameraOpen && (
             <div className="camera-status-info">
               <div className="status-main">
-                <span className={`status-icon ${faceOrientation.isFacingForward ? 'ready' : 'waiting'}`}>
-                  {faceOrientation.isFacingForward ? '✓' : '⚠'}
+                <span className={`status-icon ${faceOrientation.isFacingForward && !faceOrientation.isMasked ? 'ready' : 'waiting'}`}>
+                  {faceOrientation.isFacingForward && !faceOrientation.isMasked ? '✓' : '⚠'}
                 </span>
                 <span className="status-text">
                   {faceOrientation.message}
@@ -576,7 +637,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
             <button 
               onClick={captureImage} 
               disabled={!isCameraOpen}
-              className={isCameraOpen ? 'capture-ready' : 'capture-disabled'}
+              className={isCameraOpen && !faceOrientation.isMasked ? 'capture-ready' : 'capture-disabled'}
             >
               撮影
             </button>
