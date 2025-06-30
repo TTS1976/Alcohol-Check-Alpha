@@ -137,11 +137,11 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
     const noseToMouthDistance = Math.abs(mouthTop.y - noseTip.y);
     
     // Expected proportions for a clearly visible mouth
-    const expectedNoseToMouthRatio = 0.3; // Mouth should be about 30% of nose-to-chin distance
+    const expectedNoseToMouthRatio = 0.33; // Mouth should be about 30% of nose-to-chin distance
     const chinPoint = jaw[8]; // Bottom of chin
     const noseToChinDistance = Math.abs(chinPoint.y - noseTip.y);
-    const expectedMouthHeight = noseToChinDistance * 0.15; // Mouth should be at least 15% of nose-to-chin
-    const expectedMouthWidth = faceBox.width * 0.2; // Mouth should be at least 20% of face width
+    const expectedMouthHeight = noseToChinDistance * 0.17; // Mouth should be at least 15% of nose-to-chin
+    const expectedMouthWidth = faceBox.width * 0.22; // Mouth should be at least 20% of face width
     
     // Strict mouth visibility checks
     const isMouthHeightAdequate = mouthHeight >= expectedMouthHeight;
