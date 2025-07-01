@@ -1170,7 +1170,7 @@ function App({ user = null }: AppProps) {
           
           if (actualResult.success) {
             console.log('DirectCloud upload successful:', actualResult);
-            setUploadStatus('✅ 画像のアップロードが完了しました！');
+            setUploadStatus('画像のアップロードが完了しました！');
             
             // Set the appropriate image key based on registration type
             if (registrationType === 'end' || registrationType === 'middle') {
@@ -2310,6 +2310,53 @@ function App({ user = null }: AppProps) {
                   </div>
                 )}
 
+                {/* Camera Section - Photo Capture First */}
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200 mt-8">
+                  <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                    📸 写真撮影 <span className="text-red-500">*</span>
+                  </h3>
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm font-medium">
+                    ⚠️「
+                    <span className="text-red-600">アルコールチェッカーの測定画面</span>
+                    と
+                    <span className="text-red-600">ご自身の顔</span>
+                    が
+                    <span className="text-red-600">一緒に映るように</span>
+                    写真を撮ってください。」
+                  </p>
+                  </div>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <CameraCapture onImageSend={handleImageSend} autoOpen={true} />
+                  </div>
+                  
+                  {/* Upload Status */}
+                  {uploadStatus && (
+                    <div className={`mt-4 p-3 rounded-lg text-sm ${
+                      uploadStatus.includes('✅') || uploadStatus.includes('完了しました') 
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : isImageUploading 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                        : isImageUploaded
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : 'bg-red-100 text-red-700 border border-red-200'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {uploadStatus.includes('✅') || uploadStatus.includes('完了しました') ? (
+                          <span>✅</span>
+                        ) : isImageUploading ? (
+                          <span className="animate-spin">⏳</span>
+                        ) : isImageUploaded ? (
+                          <span>✅</span>
+                        ) : (
+                          <span>❌</span>
+                        )}
+                        <span>{uploadStatus}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Camera Section - Always shown for end/middle registration, conditional for start */}
                 {(registrationType === 'end' || registrationType === 'middle' || isSafetyFormValid) && (
                   <div className="bg-gradient-to-br from-gray-50 to-purple-50 rounded-2xl p-6 mt-8 border border-gray-200 animate-fadeIn">
@@ -2371,53 +2418,6 @@ function App({ user = null }: AppProps) {
                     </div>
                   </div>
                 )}
-                
-                {/* Camera Section - At End of Form */}
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200 mt-8">
-                  <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-                    📸 写真撮影 <span className="text-red-500">*</span>
-                  </h3>
-                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm font-medium">
-                    ⚠️「
-                    <span className="text-red-600">アルコールチェッカーの測定画面</span>
-                    と
-                    <span className="text-red-600">ご自身の顔</span>
-                    が
-                    <span className="text-red-600">一緒に映るように</span>
-                    写真を撮ってください。」
-                  </p>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 border border-gray-200">
-                    <CameraCapture onImageSend={handleImageSend} autoOpen={true} />
-                  </div>
-                  
-                  {/* Upload Status */}
-                  {uploadStatus && (
-                    <div className={`mt-4 p-3 rounded-lg text-sm ${
-                      uploadStatus.includes('✅') || uploadStatus.includes('完了しました') 
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : isImageUploading 
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                        : isImageUploaded
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : 'bg-red-100 text-red-700 border border-red-200'
-                    }`}>
-                      <div className="flex items-center gap-2">
-                        {uploadStatus.includes('✅') || uploadStatus.includes('完了しました') ? (
-                          <span>✅</span>
-                        ) : isImageUploading ? (
-                          <span className="animate-spin">⏳</span>
-                        ) : isImageUploaded ? (
-                          <span>✅</span>
-                        ) : (
-                          <span>❌</span>
-                        )}
-                        <span>{uploadStatus}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
                 
                 {/* Submit Button with Image Requirement Status */}
                 <div className="mt-8 space-y-4">
@@ -2875,6 +2875,16 @@ function App({ user = null }: AppProps) {
         {/* Camera Section with Additional Fields */}
         {isSafetyFormValid && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            {/* Camera Capture */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="text-md font-medium mb-4 flex items-center gap-2">
+                <span>📷</span>
+                写真撮影
+              </h3>
+              <div className="bg-white rounded-xl p-4 border border-gray-200">
+      <CameraCapture onImageSend={handleImageSend} />
+              </div>
+            </div>
             <h2 className="text-lg font-bold mb-4">カメラキャプチャ</h2>
             
             {/* Additional Input Fields */}
@@ -2913,17 +2923,6 @@ function App({ user = null }: AppProps) {
                 <div className="mt-2 text-xs text-gray-500">
                   <p>例：体調確認の確認について詳しく記載ください。</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Camera Capture */}
-            <div className="border-t border-gray-200 pt-4">
-              <h3 className="text-md font-medium mb-4 flex items-center gap-2">
-                <span>📷</span>
-                写真撮影
-              </h3>
-              <div className="bg-white rounded-xl p-4 border border-gray-200">
-      <CameraCapture onImageSend={handleImageSend} />
               </div>
             </div>
           </div>

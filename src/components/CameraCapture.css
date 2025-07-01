@@ -353,6 +353,79 @@
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
+  /* Override any parent container constraints */
+  .camera-capture {
+    max-width: 160% !important;
+    width: 140% !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    right: 40px !important;
+  }
+
+  .camera-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .video-wrapper {
+    min-height: 75vh;
+    max-height: 80vh;
+    margin-bottom: 0;
+    position: relative;
+  }
+
+  .camera-container video {
+    max-height: 80vh;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .face-detection-canvas {
+    max-height: 80vh;
+    min-height: 75vh;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  /* Overlay buttons on the video */
+  .camera-controls, .preview-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 25px;
+    padding: 10px 15px;
+    margin: 0;
+    width: auto;
+    max-width: 90%;
+    flex-wrap: nowrap;
+    gap: 8px;
+    z-index: 20;
+  }
+
+  .camera-controls button, .preview-controls button {
+    min-width: auto;
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 15px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .manual-override-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-width: auto;
+    border-radius: 15px;
+  }
+
   .face-status {
     top: 5px;
     left: 5px;
@@ -376,6 +449,27 @@
   
   .camera-loading {
     padding: 15px 20px;
+    font-size: 14px;
+  }
+
+  /* Adjust preview container for mobile */
+  .preview-container img {
+    max-height: 80vh;
+  }
+
+  /* Make sure status info doesn't interfere with overlay buttons */
+  .camera-status-info {
+    margin-bottom: 20px;
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  /* Reduce status info size on mobile */
+  .status-text {
+    font-size: 12px;
+  }
+
+  .status-icon {
     font-size: 14px;
   }
 }

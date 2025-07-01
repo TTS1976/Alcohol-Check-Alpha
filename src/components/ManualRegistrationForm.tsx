@@ -240,6 +240,14 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
         <h3 className="text-xl font-bold mb-6 text-gray-800">
           アルコールチェック
         </h3>
+
+         {/* Camera Capture */}
+         <div className="mb-6">
+          <h4 className="text-lg font-semibold mb-4 text-gray-800">画像撮影</h4>
+          <CameraCapture
+            onImageSend={handleImageSend}
+          />
+        </div>
         
         {/* Input Fields */}
         <div className="mb-8 space-y-6">
@@ -284,13 +292,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
           </div>
         </div>
 
-        {/* Camera Capture */}
-        <div className="mb-6">
-          <h4 className="text-lg font-semibold mb-4 text-gray-800">画像撮影</h4>
-          <CameraCapture
-            onImageSend={handleImageSend}
-          />
-        </div>
 
         {/* Upload Status */}
         {uploadStatus && (
