@@ -25,6 +25,8 @@ import './App.css';
 import { getAllDrivers, getAllSubmissions } from './utils/paginationHelper';
 import { logger } from './utils/logger';
 
+import { ADMIN_DEPARTMENTS } from './config/authConfig';
+
 // Configure client to use API key for public access
 const client = generateClient<Schema>({
   authMode: 'apiKey'
@@ -217,9 +219,9 @@ function App({ user = null }: AppProps) {
     checkUserFullAdminStatus();
   }, [user]);
 
-  // TEMPORARY: Give tts_admin1@teral365.onmicrosoft.com full admin privileges for testing
-  const isFullAdmin = user?.role === 'SafeDrivingManager' || user?.email === 'tts_admin1@teral365.onmicrosoft.com' || userFullAdminStatus;
-  const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || user?.email === 'tts_admin1@teral365.onmicrosoft.com' || userFullAdminStatus;
+  
+  const isFullAdmin = user?.role === 'SafeDrivingManager' || (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept))) || userFullAdminStatus;
+  const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept))) || userFullAdminStatus;
   const isViewerAdmin = isManager;
   const isAnyAdmin = isFullAdmin || isViewerAdmin;
   
@@ -228,8 +230,8 @@ function App({ user = null }: AppProps) {
     logger.debug('Permission check completed');
   }, [user, userFullAdminStatus, isFullAdmin, isManager, isAnyAdmin]);
   
-  // TEMPORARY: Override user role for testing - give tts_admin1@teral365.onmicrosoft.com SafeDrivingManager access
-  const tempUser = user?.email === 'tts_admin1@teral365.onmicrosoft.com' ? { ...user, role: 'SafeDrivingManager' } : user;
+  
+  const tempUser = (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept))) ? { ...user, role: 'SafeDrivingManager' } : user;
 
   // Add this state for the clock at the top with other state declarations
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -2060,7 +2062,7 @@ function App({ user = null }: AppProps) {
                       
                       {availableConfirmers.length > 0 && (
                         <div className="mt-2 text-xs text-gray-400">
-                          Debug: {availableConfirmers.length} confirmers available: {availableConfirmers.map(c => `${c.name}(${c.role})`).join(', ')}
+                          {availableConfirmers.length} confirmers available: {availableConfirmers.map(c => `${c.name}(${c.role})`).join(', ')}
                         </div>
                       )}
                     </div>

@@ -7,7 +7,7 @@ import {
 import { msalConfig, loginRequest } from '../config/authConfig';
 import { AuthContextType, AuthState } from '../types/auth';
 import { GraphService } from '../services/graphService';
-import { UserRole } from '../config/authConfig';
+import { UserRole, ADMIN_DEPARTMENTS } from '../config/authConfig';
 import { logger } from '../utils/logger';
 
 // Create MSAL instance
@@ -367,26 +367,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkUserRole = (requiredRole: UserRole): boolean => {
     if (!authState.user) return false;
-    
-    // TEMPORARY: Give tts_admin1@teral365.onmicrosoft.com full admin privileges for testing
-    if (authState.user.email === 'tts_admin1@teral365.onmicrosoft.com') {
+    // Department-based admin
+    if (authState.user && authState.user.department && ADMIN_DEPARTMENTS.some(dept => authState.user!.department!.includes(dept))) {
       return true; // Grant all permissions
     }
-    
     // SafeDrivingManager has access to everything
     if (authState.user.role === 'SafeDrivingManager') return true;
-    
     return authState.user.role === requiredRole;
   };
 
   const canSelectConfirmer = (confirmerId: string): boolean => {
     if (!authState.user) return false;
-    
-    // TEMPORARY: Give tts_admin1@teral365.onmicrosoft.com full confirmer selection privileges for testing
-    if (authState.user.email === 'tts_admin1@teral365.onmicrosoft.com') {
+    // Department-based admin
+    if (authState.user && authState.user.department && ADMIN_DEPARTMENTS.some(dept => authState.user!.department!.includes(dept))) {
       return true; // Can select any confirmer
     }
-    
     return authState.user.canSelectConfirmers.includes(confirmerId);
   };
 
