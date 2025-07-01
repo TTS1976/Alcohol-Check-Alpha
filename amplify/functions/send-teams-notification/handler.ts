@@ -121,7 +121,7 @@ export const handler: Handler = async (event) => {
     const inspectionResult = inspectionResultMatch ? inspectionResultMatch[1] : 'Unknown';
     
     // Create approval URL
-    const approvalUrl = `${process.env.APP_URL || 'http://localhost:5173'}/approve/${submissionId}`;
+    const approvalUrl = `${process.env.APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : 'https://tts-group.jp')}/approve/${submissionId}`;
     
     // Validate that we have a valid user access token
     if (!isTokenValid) {
