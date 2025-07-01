@@ -118,7 +118,8 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       // FIX: Use the same approach as ApprovalManagement to avoid AWS Amplify filter inconsistency
       // Query ALL submissions first, then filter in memory
       const result = await getSubmissionsPaginated({
-        limit: 100 // Get more submissions to ensure we catch all recent ones
+        limit: 100, // Get more submissions to ensure we catch all recent ones
+        sortDirection: 'DESC' // Ensure latest submissions come first
       });
       
       // Filter for non-rejected submissions in memory (this bypasses AWS Amplify query filter issues)
@@ -148,7 +149,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       setHasMore(result.hasMore);
       setTotalLoaded(nonRejectedSubmissions.length);
 
-      setStatus(`✅ ${nonRejectedSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (さらに読み込み可能)' : ''}`);
+      setStatus(`✅ ${nonRejectedSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (過去の申請をさらに読み込み可能)' : ''}`);
       
       // Fetch related submissions for end registrations
       await fetchRelatedSubmissions(nonRejectedSubmissions);
@@ -170,12 +171,13 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
     setIsLoading(true);
     try {
       logger.debug('Loading more submissions...');
-      setStatus('追加データを読み込み中...');
+      setStatus('過去の申請データを読み込み中...');
       
       const result = await getSubmissionsPaginated({
         limit: 50,
         nextToken: nextToken,
-        excludeRejected: true
+        excludeRejected: true,
+        sortDirection: 'DESC' // Continue loading older submissions
       });
       
       logger.debug(`Loaded ${result.items.length} additional submissions`);
@@ -186,7 +188,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
       setTotalLoaded(newSubmissions.length);
-      setStatus(`✅ ${newSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (さらに読み込み可能)' : ''}`);
+      setStatus(`✅ ${newSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (過去の申請をさらに読み込み可能)' : ''}`);
       
       // Fetch related submissions for new items
       await fetchRelatedSubmissions(result.items);
@@ -804,7 +806,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
                 <span className="font-medium">データ状況:</span> 
                 <span className="ml-2">
                   読み込み済み: <span className="font-semibold text-green-600">{totalLoaded}件</span>
-                  {hasMore && <span className="text-blue-600 ml-1">(さらに読み込み可能)</span>}
+                  {hasMore && <span className="text-blue-600 ml-1">(過去の申請をさらに読み込み可能)</span>}
                 </span>
                 {viewMode === 'grouped' ? (
                   <div className="mt-1">
@@ -833,7 +835,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
                     </>
                   ) : (
                     <>
-                      📥 さらに読み込み
+                      📥 過去の申請を読み込み
                     </>
                   )}
                 </button>

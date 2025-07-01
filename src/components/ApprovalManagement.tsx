@@ -20,7 +20,11 @@ interface ApprovalManagementProps {
 const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user }) => {
   const { checkUserRole, graphService } = useAuth();
   
-
+  // Server-side pagination state
+  const [nextToken, setNextToken] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalLoaded, setTotalLoaded] = useState(0);
   
   // Legacy states
   const [pendingSubmissions, setPendingSubmissions] = useState<any[]>([]);
@@ -75,6 +79,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     // NEW: Load initial pending submissions with pagination
   const loadPendingSubmissions = async (showRefreshStatus = true, retryCount = 0) => {
+    setIsLoading(true);
     try {
       if (showRefreshStatus) {
         setStatus('承認待ち申請を読み込み中...');
@@ -85,7 +90,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       // FIX: Use the same approach as debug query to avoid AWS Amplify filter inconsistency
       // Query ALL submissions first, then filter in memory for PENDING status
       const result = await getSubmissionsPaginated({
-        limit: 100 // Get more submissions to ensure we catch all
+        limit: 100, // Get more submissions to ensure we catch all
+        sortDirection: 'DESC' // Ensure latest submissions come first
       });
       
       // Filter for PENDING submissions in memory (this bypasses AWS Amplify query filter issues)
@@ -117,17 +123,59 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       }
       
       setPendingSubmissions(pendingSubmissions);
-      setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました (${Object.keys(registrationTypes).join(', ')})`);
+      setNextToken(result.nextToken);
+      setHasMore(result.hasMore);
+      setTotalLoaded(pendingSubmissions.length);
+      setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました (${Object.keys(registrationTypes).join(', ')})${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
       
     } catch (error) {
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
-      // No cleanup needed
+      setIsLoading(false);
     }
   };
 
-
+  // NEW: Load more submissions when user clicks "Load More"
+  const loadMoreSubmissions = async () => {
+    if (!hasMore || isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      logger.debug('Loading more submissions...');
+      setStatus('過去の承認待ち申請を読み込み中...');
+      
+      const result = await getSubmissionsPaginated({
+        limit: 50,
+        nextToken: nextToken,
+        sortDirection: 'DESC' // Continue loading older submissions
+      });
+      
+      // Filter for PENDING submissions in memory
+      const newPendingSubmissions = result.items.filter(sub => sub.approvalStatus === 'PENDING');
+      
+      logger.debug(`Loaded ${result.items.length} additional submissions, ${newPendingSubmissions.length} pending`);
+      
+      const allPendingSubmissions = [...pendingSubmissions, ...newPendingSubmissions];
+      setPendingSubmissions(allPendingSubmissions);
+      setNextToken(result.nextToken);
+      setHasMore(result.hasMore);
+      setTotalLoaded(prev => prev + newPendingSubmissions.length);
+      
+      const registrationTypes = allPendingSubmissions.reduce((acc: Record<string, boolean>, sub) => {
+        acc[sub.registrationType] = true;
+        return acc;
+      }, {});
+      
+      setStatus(`✅ ${allPendingSubmissions.length}件の承認待ち申請を読み込みました (${Object.keys(registrationTypes).join(', ')})${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
+      
+    } catch (error) {
+      logger.error('Failed to load more submissions:', error);
+      setStatus('追加データの読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const resolveVehicleNames = async () => {
     if (!graphService) return;
@@ -224,11 +272,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
             submission.confirmerId === user.id ||
             submission.confirmerId === user.objectId ||
             submission.confirmerId === user.email ||
+            submission.confirmerId === user.azureId ||
             submission.confirmerEmail === user.email ||
             submission.confirmedBy === user.displayName ||
             submission.confirmedBy === user.mailNickname;
           
-          // DEBUG: Log submission details for debugging
           if (!isSelectedConfirmer) {
             logger.debug(`Submission ${submission.id} (${submission.registrationType}) not matched:`, {
               confirmerId: submission.confirmerId,
@@ -238,6 +286,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
                 mailNickname: user.mailNickname,
                 id: user.id,
                 objectId: user.objectId,
+                azureId: user.azureId,
                 email: user.email,
                 displayName: user.displayName
               }
@@ -462,6 +511,25 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold">検索フィルター</h2>
+            {/* Load More Button */}
+            {hasMore && (
+              <button
+                onClick={loadMoreSubmissions}
+                disabled={isLoading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    読み込み中...
+                  </>
+                ) : (
+                  <>
+                    📥 過去の申請を読み込み
+                  </>
+                )}
+              </button>
+            )}
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
@@ -474,6 +542,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
               />
             </div>
           </div>
+          {/* Show load status */}
+          {totalLoaded > 0 && (
+            <div className="mt-3 text-sm text-gray-600">
+              読み込み済み: {totalLoaded}件{hasMore ? ' (過去の申請をさらに読み込み可能)' : ' (全件読み込み完了)'}
+            </div>
+          )}
         </div>
 
         {/* Submissions List */}

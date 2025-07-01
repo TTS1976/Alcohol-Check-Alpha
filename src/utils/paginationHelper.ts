@@ -98,8 +98,9 @@ export async function getSubmissionsPaginated(options: {
   limit?: number;
   nextToken?: string;
   excludeRejected?: boolean;
+  sortDirection?: 'ASC' | 'DESC';
 } = {}): Promise<PaginatedResult<Schema["AlcoholCheckSubmission"]["type"]>> {
-  const { approvalStatus, registrationType, submittedBy, limit = 50, nextToken, excludeRejected } = options;
+  const { approvalStatus, registrationType, submittedBy, limit = 50, nextToken, excludeRejected, sortDirection = 'DESC' } = options;
   
   let filter: any = {};
   
@@ -122,7 +123,8 @@ export async function getSubmissionsPaginated(options: {
   return getItemsPaginated<Schema["AlcoholCheckSubmission"]["type"]>('AlcoholCheckSubmission', {
     filter: Object.keys(filter).length > 0 ? filter : undefined,
     limit,
-    nextToken
+    nextToken,
+    sortDirection
   });
 }
 
