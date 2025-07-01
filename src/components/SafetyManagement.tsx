@@ -29,7 +29,7 @@ interface SubmissionGroup {
   isComplete: boolean; // Whether the group has an end submission
 }
 
-const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => {
+const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user }) => {
   const { graphService } = useAuth();
   
   // Server-side pagination state
@@ -61,11 +61,12 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
   const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
   const itemsPerPage = 20; // Increased from 10 since we're loading more efficiently
 
+
   // Temporarily bypass admin check for authentication removal
   // const isAdmin = true; // user?.signInDetails?.loginId === "tts-driver-admin@teral.co.jp" || user?.username === "tts-driver-admin@teral.co.jp" || user?.signInDetails?.loginId === "tts-driver@teral.co.jp" || user?.username === "tts-driver@teral.co.jp";
 
   useEffect(() => {
-    loadInitialSubmissions();
+    loadInitialSubmissions(false); // Don't show refresh status on initial load
   }, []);
 
   useEffect(() => {
@@ -86,30 +87,71 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
     }
   }, [allSubmissions, graphService]);
 
+  // NEW: Auto-refresh when page becomes visible to handle database consistency
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        logger.debug('Safety management page became visible, refreshing data for consistency...');
+        // Delay slightly to ensure any recent submissions are available
+        setTimeout(() => {
+          loadInitialSubmissions(true);
+        }, 1500);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // NEW: Load initial submissions with server-side pagination
-  const loadInitialSubmissions = async () => {
+  const loadInitialSubmissions = async (showRefreshStatus = true, retryCount = 0) => {
     setIsLoading(true);
     try {
-      logger.info('Loading initial submissions with server-side pagination...');
-      setStatus('申請データを読み込み中...');
+      if (showRefreshStatus) {
+        setStatus('申請データを読み込み中...');
+      }
       
-      // Load first page of submissions (50 items by default)
+      logger.info('Loading initial submissions with server-side pagination...');
+      
+      // FIX: Use the same approach as ApprovalManagement to avoid AWS Amplify filter inconsistency
+      // Query ALL submissions first, then filter in memory
       const result = await getSubmissionsPaginated({
-        limit: 50,
-        excludeRejected: true
+        limit: 100 // Get more submissions to ensure we catch all recent ones
       });
       
-      logger.info(`Loaded ${result.items.length} initial submissions`);
+      // Filter for non-rejected submissions in memory (this bypasses AWS Amplify query filter issues)
+      const nonRejectedSubmissions = result.items.filter(sub => sub.approvalStatus !== 'REJECTED');
       
-      setCurrentSubmissions(result.items);
-      setAllSubmissions(result.items); // Keep for backward compatibility
+      logger.info(`Loaded ${result.items.length} total submissions, ${nonRejectedSubmissions.length} non-rejected submissions`);
+      
+      // Check submission recency to detect if we might be missing recent submissions
+      const now = new Date().getTime();
+      const recentSubmissions = nonRejectedSubmissions.filter(sub => {
+        const submitTime = new Date(sub.submittedAt).getTime();
+        return (now - submitTime) < 60000; // Within last minute
+      });
+      
+      // If we haven't loaded any very recent submissions but we expected to, retry
+      if (recentSubmissions.length === 0 && retryCount < 1) {
+        logger.warn(`No recent submissions found, checking for database consistency... (attempt ${retryCount + 1}/2)`);
+        setTimeout(() => {
+          loadInitialSubmissions(false, retryCount + 1);
+        }, 3000);
+        return;
+      }
+      
+      setCurrentSubmissions(nonRejectedSubmissions);
+      setAllSubmissions(nonRejectedSubmissions); // Keep for backward compatibility
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
-      setTotalLoaded(result.items.length);
-      setStatus(`✅ ${result.items.length}件の申請を読み込みました${result.hasMore ? ' (さらに読み込み可能)' : ''}`);
+      setTotalLoaded(nonRejectedSubmissions.length);
+
+      setStatus(`✅ ${nonRejectedSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (さらに読み込み可能)' : ''}`);
       
       // Fetch related submissions for end registrations
-      await fetchRelatedSubmissions(result.items);
+      await fetchRelatedSubmissions(nonRejectedSubmissions);
       
     } catch (error) {
       logger.error('Failed to load initial submissions:', error);
@@ -118,6 +160,8 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
       setIsLoading(false);
     }
   };
+
+
 
   // NEW: Load more submissions when user clicks "Load More"
   const loadMoreSubmissions = async () => {
@@ -162,28 +206,28 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
       logger.debug('Loading filtered submissions...');
       setStatus('フィルター適用中...');
       
-      let filter: any = {};
-      
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        filter.approvalStatus = statusFilter;
-      } else {
-        filter.excludeRejected = true;
-      }
-      
+      // FIX: Query ALL submissions first, then filter in memory to avoid AWS Amplify inconsistency
       const result = await getSubmissionsPaginated({
-        ...filter,
         limit: 100 // Load more when filtering
       });
       
-      logger.debug(`Loaded ${result.items.length} filtered submissions`);
+      // Apply status filter in memory
+      let filteredSubmissions = result.items;
       
-      setCurrentSubmissions(result.items);
-      setAllSubmissions(result.items);
+      if (statusFilter !== 'all') {
+        filteredSubmissions = filteredSubmissions.filter(sub => sub.approvalStatus === statusFilter);
+      } else {
+        filteredSubmissions = filteredSubmissions.filter(sub => sub.approvalStatus !== 'REJECTED');
+      }
+      
+      logger.debug(`Loaded ${result.items.length} total submissions, ${filteredSubmissions.length} after filtering`);
+      
+      setCurrentSubmissions(filteredSubmissions);
+      setAllSubmissions(filteredSubmissions);
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
-      setTotalLoaded(result.items.length);
-      setStatus(`✅ ${result.items.length}件の申請を読み込みました (フィルター適用済み)`);
+      setTotalLoaded(filteredSubmissions.length);
+      setStatus(`✅ ${filteredSubmissions.length}件の申請を読み込みました (フィルター適用済み)`);
       
       // Reset pagination
       setCurrentPage(1);
@@ -584,8 +628,8 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-green-500 text-white p-4">
+      {/* Header with refresh button */}
+      <div className="bg-green-600 text-white p-4">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-xl font-bold">安全運転管理</h1>
@@ -603,19 +647,21 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
                   承認待ち: {filteredSubmissions.filter(s => s.approvalStatus === 'PENDING').length}件
                 </>
               )} |
-              読み込み済み: {totalLoaded}件 |
-              あなたの役職: {user?.position || '一般'} (レベル{user?.jobLevel || 1})
+              読み込み済み: {totalLoaded}件
               {isLoading && <span className="ml-2 text-yellow-200">🔄 データ読み込み中...</span>}
             </p>
           </div>
-          {onBack && (
-            <button 
-              onClick={onBack}
-              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm"
-            >
-              ← 戻る
-            </button>
-          )}
+          <div className="flex gap-2">
+
+            {onBack && (
+              <button 
+                onClick={onBack}
+                className="bg-green-700 hover:bg-green-800 px-4 py-2 rounded text-sm"
+              >
+                ← 戻る
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -742,12 +788,11 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user }) => 
                     setSearchTerm('');
                     setStatusFilter('all');
                     setSearchBy('all');
-                    loadInitialSubmissions();
                   }}
                   disabled={isLoading}
                   className="w-full p-3 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-400 text-white rounded-md transition-colors"
                 >
-                  クリア & リロード
+                  フィルタークリア
                 </button>
               </div>
             </div>

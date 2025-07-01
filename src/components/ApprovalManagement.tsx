@@ -29,6 +29,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   const [status, setStatus] = useState('');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+ 
 
   const [vehicleNames, setVehicleNames] = useState<{[key: string]: string}>({});
   const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
@@ -37,7 +38,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
 
   useEffect(() => {
-    loadPendingSubmissions();
+    loadPendingSubmissions(false); // Don't show refresh status on initial load
   }, []);
 
   useEffect(() => {
@@ -54,28 +55,79 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     }
   }, [pendingSubmissions, graphService]);
 
+  // NEW: Auto-refresh when page becomes visible to handle database consistency
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        logger.debug('Page became visible, refreshing approval data for consistency...');
+        // Delay slightly to ensure any recent submissions are available
+        setTimeout(() => {
+          loadPendingSubmissions(false);
+        }, 1000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
     // NEW: Load initial pending submissions with pagination
-  const loadPendingSubmissions = async () => {
+  const loadPendingSubmissions = async (showRefreshStatus = true, retryCount = 0) => {
     try {
-      logger.info('Loading pending submissions with server-side pagination...');
-      setStatus('承認待ち申請を読み込み中...');
+      if (showRefreshStatus) {
+        setStatus('承認待ち申請を読み込み中...');
+      }
       
-      // Load pending submissions only (50 items by default)
+      logger.info('Loading pending submissions with server-side pagination...');
+      
+      // FIX: Use the same approach as debug query to avoid AWS Amplify filter inconsistency
+      // Query ALL submissions first, then filter in memory for PENDING status
       const result = await getSubmissionsPaginated({
-        approvalStatus: 'PENDING',
-        limit: 50
+        limit: 100 // Get more submissions to ensure we catch all
       });
       
-      logger.info(`Loaded ${result.items.length} pending submissions`);
+      // Filter for PENDING submissions in memory (this bypasses AWS Amplify query filter issues)
+      const pendingSubmissions = result.items.filter(sub => sub.approvalStatus === 'PENDING');
       
-      setPendingSubmissions(result.items);
-      setStatus(`✅ ${result.items.length}件の承認待ち申請を読み込みました`);
+      logger.info(`Loaded ${result.items.length} total submissions, ${pendingSubmissions.length} pending submissions by registration type:`, 
+        pendingSubmissions.reduce((acc: Record<string, number>, sub) => {
+          acc[sub.registrationType] = (acc[sub.registrationType] || 0) + 1;
+          return acc;
+        }, {})
+      );
+      
+      // Check if we're missing expected submission types and retry if needed
+      const registrationTypes = pendingSubmissions.reduce((acc: Record<string, boolean>, sub) => {
+        acc[sub.registrationType] = true;
+        return acc;
+      }, {});
+      
+      const hasOnlyStartRegistrations = Object.keys(registrationTypes).length === 1 && 
+                                      registrationTypes['運転開始登録'] === true;
+      
+      // If we only have start registrations and this might be a consistency issue, retry
+      if (hasOnlyStartRegistrations && pendingSubmissions.length > 0 && retryCount < 2) {
+        logger.warn(`Only found 運転開始登録 submissions, retrying in 2 seconds... (attempt ${retryCount + 1}/3)`);
+        setTimeout(() => {
+          loadPendingSubmissions(false, retryCount + 1);
+        }, 2000);
+        return;
+      }
+      
+      setPendingSubmissions(pendingSubmissions);
+      setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました (${Object.keys(registrationTypes).join(', ')})`);
       
     } catch (error) {
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      // No cleanup needed
     }
   };
+
+
 
   const resolveVehicleNames = async () => {
     if (!graphService) return;
@@ -156,8 +208,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     // Apply role-based filtering - show only submissions where current user is the selected confirmer
     if (user) {
-      logger.debug('Filtering submissions for user');
-      logger.debug('Checking user permissions');
+      logger.debug('Filtering submissions for user:', user.mailNickname || user.email);
+      logger.debug('Total submissions before filtering:', filtered.length);
       
       if (checkUserRole('SafeDrivingManager')) {
         // SafeDrivingManager can see all submissions
@@ -176,24 +228,51 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
             submission.confirmedBy === user.displayName ||
             submission.confirmedBy === user.mailNickname;
           
+          // DEBUG: Log submission details for debugging
+          if (!isSelectedConfirmer) {
+            logger.debug(`Submission ${submission.id} (${submission.registrationType}) not matched:`, {
+              confirmerId: submission.confirmerId,
+              confirmerEmail: submission.confirmerEmail,
+              confirmedBy: submission.confirmedBy,
+              userIdentifiers: {
+                mailNickname: user.mailNickname,
+                id: user.id,
+                objectId: user.objectId,
+                email: user.email,
+                displayName: user.displayName
+              }
+            });
+          }
+          
           return isSelectedConfirmer;
         });
         
-        // If no submissions matched exact criteria, show a warning
+        // Enhanced debugging for ID mismatch issues
         if (filtered.length === 0 && originalFiltered.length > 0) {
-          logger.warn('No submissions matched user identifiers exactly. This might indicate an ID mismatch issue.');
+          logger.warn('No submissions matched user identifiers. Registration types in original list:', 
+            originalFiltered.map(s => s.registrationType));
+          logger.warn('Sample confirmer data from submissions:', 
+            originalFiltered.slice(0, 3).map(s => ({
+              registrationType: s.registrationType,
+              confirmerId: s.confirmerId,
+              confirmerEmail: s.confirmerEmail,
+              confirmedBy: s.confirmedBy
+            }))
+          );
         }
       }
     }
 
-    logger.debug('Filtered submissions count:', filtered.length);
+    logger.debug('Filtered submissions count:', filtered.length, 'by type:', 
+      filtered.reduce((acc: Record<string, number>, sub) => {
+        acc[sub.registrationType] = (acc[sub.registrationType] || 0) + 1;
+        return acc;
+      }, {})
+    );
+    
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
   };
-
-
-
-
 
 
 
@@ -377,9 +456,13 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           </div>
         )}
 
+
+
         {/* Search Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-bold mb-4">検索フィルター</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold">検索フィルター</h2>
+          </div>
           <div className="flex gap-4">
             <div className="flex-1">
               <input

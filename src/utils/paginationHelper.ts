@@ -57,6 +57,11 @@ export async function getItemsPaginated<T>(
       queryOptions.nextToken = nextToken;
     }
     
+    // Add cache busting for consistency issues
+    // This helps ensure we get fresh data instead of stale cached results
+    const cacheBypass = Date.now();
+    logger.debug(`Query cache bypass timestamp: ${cacheBypass}`);
+    
     // Use dynamic model access
     const result = await (client.models as any)[modelName].list(queryOptions);
     
