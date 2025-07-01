@@ -161,4 +161,10 @@ export const ROLES = {
 export type UserRole = typeof ROLES[keyof typeof ROLES];
 
 // Job level thresholds
-export const JOB_LEVEL_THRESHOLD = 4; 
+export const JOB_LEVEL_THRESHOLD = 4;
+
+// Departments that should be considered full admin
+export const ADMIN_DEPARTMENTS = [
+  '企画部/情報システム課/情報システムG',
+  '企画部/情報システム課',
+]; 
