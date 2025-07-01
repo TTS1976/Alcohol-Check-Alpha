@@ -90,7 +90,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       // FIX: Use the same approach as debug query to avoid AWS Amplify filter inconsistency
       // Query ALL submissions first, then filter in memory for PENDING status
       const result = await getSubmissionsPaginated({
-        limit: 100, // Get more submissions to ensure we catch all
+        limit: 200, // Increase limit to capture more pending submissions in first load
         sortDirection: 'DESC' // Ensure latest submissions come first
       });
       
