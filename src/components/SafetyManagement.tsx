@@ -75,7 +75,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
     } else {
       filterSubmissions();
     }
-  }, [searchTerm, searchBy, statusFilter, dateFrom, dateTo, viewMode]); // Removed allSubmissions to prevent infinite loop
+  }, [searchTerm, searchBy, statusFilter, dateFrom, dateTo, viewMode, allSubmissions]); // Added allSubmissions to trigger recalculation after data fetch
 
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
