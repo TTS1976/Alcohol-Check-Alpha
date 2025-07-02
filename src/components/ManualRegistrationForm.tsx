@@ -35,13 +35,10 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
 
   const handleInputChange = (field: keyof ManualFormData, value: string) => {
     if (field === 'inspectionResult') {
-      // Auto-format inspection result
+      // Allow free input - only filter out non-numeric characters but don't auto-format
       const numericValue = value.replace(/[^\d.]/g, '');
-      if (numericValue && !value.includes('.')) {
-        const formattedValue = numericValue + '.00';
-        setFormData(prev => ({ ...prev, [field]: formattedValue }));
-        return;
-      }
+      setFormData(prev => ({ ...prev, [field]: numericValue }));
+      return;
     }
     
     setFormData(prev => ({ ...prev, [field]: value }));

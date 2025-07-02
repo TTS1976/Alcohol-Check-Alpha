@@ -240,6 +240,9 @@ function App({ user = null }: AppProps) {
   
   // Ref to track if driver name has been set to prevent infinite loops
   const driverNameSetRef = useRef(false);
+  
+  // Ref for auto-scrolling to registration type selection
+  const registrationTypeRef = useRef<HTMLDivElement>(null);
 
   // Wrap functions in useCallback to prevent recreation on each render
 
@@ -721,24 +724,40 @@ function App({ user = null }: AppProps) {
     }
   }, [user, loadAvailableConfirmers]);
 
+  // Auto-scroll to registration type selection when user logs in and data is loaded
+  useEffect(() => {
+    if (user && 
+        isRegisteredDriver !== null && 
+        !isWorkflowLoading && 
+        registrationTypeRef.current &&
+        currentView === 'main' &&
+        !showForm &&
+        !showManualForm) {
+      
+      // Small delay to ensure DOM is fully rendered
+      const scrollTimer = setTimeout(() => {
+        registrationTypeRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 500);
+
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [user, isRegisteredDriver, isWorkflowLoading, currentView, showForm, showManualForm]);
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     if (field === 'inspectionResult' && typeof value === 'string') {
-      // If the value is a number (digits only), automatically add .00
+      // Allow free input - only filter out non-numeric characters but don't auto-format
       const numericValue = value.replace(/[^\d.]/g, ''); // Remove non-digits and non-decimal points
-      if (numericValue && !value.includes('.')) {
-        // If it's just digits without a decimal point, add .00
-        const formattedValue = numericValue + '.00';
-        setFormData(prev => ({ ...prev, [field]: formattedValue }));
-        return;
-      }
+      setFormData(prev => ({ ...prev, [field]: numericValue }));
+      return;
     } else if (field === 'inspectionResultEnd' && typeof value === 'string') {
-      // Same handling for end registration inspection result
+      // Same handling for end registration inspection result - allow free input
       const numericValue = value.replace(/[^\d.]/g, '');
-      if (numericValue && !value.includes('.')) {
-        const formattedValue = numericValue + '.00';
-        setFormData(prev => ({ ...prev, [field]: formattedValue }));
-        return;
-      }
+      setFormData(prev => ({ ...prev, [field]: numericValue }));
+      return;
     }
     
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -1603,7 +1622,7 @@ function App({ user = null }: AppProps) {
           ) : !showForm ? (
             <div className="space-y-8 animate-fadeIn min-h-[70vh] flex flex-col">
               {/* Welcome Section */}
-              <div className="text-center space-y-4 mb-12 flex-1">
+              <div ref={registrationTypeRef} className="text-center space-y-4 mb-12 flex-1">
                 <h2 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-4">
                   登録タイプを選択してください
                 </h2>
