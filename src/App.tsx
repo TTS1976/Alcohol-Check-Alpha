@@ -242,6 +242,9 @@ function App({ user = null }: AppProps) {
   // Ref for auto-scrolling to registration type selection
   const registrationTypeRef = useRef<HTMLDivElement>(null);
   
+  // Ref for auto-scrolling to confirmer selection
+  const confirmerSelectionRef = useRef<HTMLDivElement>(null);
+  
   // State for mobile navigation accordion
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -744,6 +747,25 @@ function App({ user = null }: AppProps) {
     }
   }, [user, isRegisteredDriver, isWorkflowLoading, currentView, showForm, showManualForm]);
 
+  // Auto-scroll to confirmer selection for middle and end registrations
+  useEffect(() => {
+    if (showForm && 
+        (registrationType === 'middle' || registrationType === 'end') &&
+        confirmerSelectionRef.current) {
+      
+      // Small delay to ensure DOM is fully rendered
+      const scrollTimer = setTimeout(() => {
+        confirmerSelectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 300);
+
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [showForm, registrationType]);
+
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     if (field === 'inspectionResult' && typeof value === 'string') {
       // Allow free input - only filter out non-numeric characters but don't auto-format
@@ -814,8 +836,8 @@ function App({ user = null }: AppProps) {
 
       // Invoke Teams notification Lambda function with correct parameters
       const command = new InvokeCommand({
-        // FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
-        FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
+        FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
+        // FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
         Payload: JSON.stringify({
           submissionId,
           content: notificationContent,
@@ -1091,8 +1113,8 @@ function App({ user = null }: AppProps) {
 
         // Invoke DirectCloud upload Lambda function
         const command = new InvokeCommand({
-          // FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
-          FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
+          FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
+          // FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
           Payload: JSON.stringify({
             fileName: fileName,
             fileData: base64Data,
@@ -2053,7 +2075,7 @@ function App({ user = null }: AppProps) {
                 </div>
 
                 {/* Confirmer Selection - Show at the beginning */}
-                <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-2 border-blue-500">
+                <div ref={confirmerSelectionRef} className="bg-white rounded-lg shadow-md p-6 mb-6 border-2 border-blue-500">
                   <h2 className="text-lg font-bold mb-6 flex items-center gap-2 bg-blue-100 p-3 rounded">
                     <span>👥</span>
                     確認者選択

@@ -20,6 +20,9 @@ interface ApprovalManagementProps {
 const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user }) => {
   const { checkUserRole, graphService } = useAuth();
   
+  // Constants
+  const MAX_RETRIES = 3; // Maximum number of retry attempts for data consistency
+  
   // Server-side pagination state
   const [nextToken, setNextToken] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(true);
@@ -47,7 +50,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
   useEffect(() => {
     filterSubmissions();
-  }, [searchTerm, pendingSubmissions, user]);
+  }, [searchTerm, user]);
 
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
@@ -57,7 +60,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       }
       resolveDriverNames();
     }
-  }, [pendingSubmissions, graphService]);
+  }, [pendingSubmissions.length, graphService]);
 
   // NEW: Auto-refresh when page becomes visible to handle database consistency
   useEffect(() => {
@@ -114,8 +117,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
                                       registrationTypes['運転開始登録'] === true;
       
       // If we only have start registrations and this might be a consistency issue, retry
-      if (hasOnlyStartRegistrations && pendingSubmissions.length > 0 && retryCount < 2) {
-        logger.warn(`Only found 運転開始登録 submissions, retrying in 2 seconds... (attempt ${retryCount + 1}/3)`);
+      if (hasOnlyStartRegistrations && pendingSubmissions.length > 0 && retryCount < MAX_RETRIES) {
+        logger.warn(`Only found 運転開始登録 submissions, retrying in 2 seconds... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
         setTimeout(() => {
           loadPendingSubmissions(false, retryCount + 1);
         }, 2000);
