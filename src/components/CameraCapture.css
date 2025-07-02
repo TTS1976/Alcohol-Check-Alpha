@@ -392,8 +392,8 @@
     object-fit: cover;
   }
 
-  /* Overlay buttons on the video */
-  .camera-controls, .preview-controls {
+  /* Overlay buttons on the video for mobile only */
+  .camera-container .camera-controls {
     position: absolute;
     bottom: 20px;
     left: 50%;
@@ -410,7 +410,25 @@
     z-index: 20;
   }
 
-  .camera-controls button, .preview-controls button {
+  /* Keep preview controls as overlay too */
+  .preview-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 25px;
+    padding: 10px 15px;
+    margin: 0;
+    width: auto;
+    max-width: 90%;
+    flex-wrap: nowrap;
+    gap: 8px;
+    z-index: 20;
+  }
+
+  .camera-container   .camera-container .camera-controls button, .preview-controls button {
     min-width: auto;
     padding: 8px 12px;
     font-size: 12px;

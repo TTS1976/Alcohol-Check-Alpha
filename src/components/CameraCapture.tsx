@@ -629,18 +629,6 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
                 {faceOrientation.isFacingForward && !faceOrientation.isMasked ? '✓ 撮影可能' : faceOrientation.isMasked ? '⚠ マスクを外してください' : '⚠ 顔を確認中...'}
               </div>
             )}
-            
-            {/* Camera Controls - moved inside video-wrapper to overlay on video */}
-            <div className="camera-controls">
-              <button 
-                onClick={captureImage} 
-                disabled={!isCameraOpen}
-                className={isCameraOpen && !faceOrientation.isMasked ? 'capture-ready' : 'capture-disabled'}
-              >
-                撮影
-              </button>
-              <button onClick={stopCamera}>閉じる</button>
-            </div>
           </div>
           
           {/* Status Information Below Camera */}
@@ -659,6 +647,18 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageSend, autoOpen = f
               </div> */}
             </div>
           )}
+          
+          {/* Camera Controls - back to original position for desktop, will be repositioned via CSS on mobile */}
+          <div className="camera-controls">
+            <button 
+              onClick={captureImage} 
+              disabled={!isCameraOpen}
+              className={isCameraOpen && !faceOrientation.isMasked ? 'capture-ready' : 'capture-disabled'}
+            >
+              撮影
+            </button>
+            <button onClick={stopCamera}>閉じる</button>
+          </div>
         </div>
       )}
 
