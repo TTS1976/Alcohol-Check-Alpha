@@ -75,7 +75,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
     } else {
       filterSubmissions();
     }
-  }, [searchTerm, searchBy, statusFilter, dateFrom, dateTo, allSubmissions, viewMode]);
+  }, [searchTerm, searchBy, statusFilter, dateFrom, dateTo, viewMode]); // Removed allSubmissions to prevent infinite loop
 
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
@@ -85,7 +85,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       }
       resolveDriverNames();
     }
-  }, [allSubmissions, graphService]);
+  }, [allSubmissions.length, graphService]); // Use length instead of full array to prevent infinite loop
 
   // NEW: Auto-refresh when page becomes visible to handle database consistency
   useEffect(() => {

@@ -607,7 +607,7 @@ function App({ user = null }: AppProps) {
     if (user && user.mailNickname) {
       validateDriverRegistration();
     }
-  }, [registrationType, user, loadVehicles, loadAzureVehicles, loadAvailableConfirmers, validateDriverRegistration]);
+  }, [registrationType, user]); // Removed function dependencies to prevent circular dependency
 
   // Separate useEffect to ensure driver name is populated when user data becomes available
   useEffect(() => {
@@ -628,7 +628,7 @@ function App({ user = null }: AppProps) {
       
       driverNameSetRef.current = true;
     }
-  }, [user, formData.driverName]); // Keep formData.driverName but use ref to prevent infinite loops
+  }, [user]); // Removed formData.driverName dependency to prevent infinite loops, using ref instead
 
   // Reset the driver name ref when user changes
   useEffect(() => {
@@ -714,7 +714,7 @@ function App({ user = null }: AppProps) {
     if (user && user.mailNickname) {
       checkUserWorkflowState();
     }
-  }, [user, checkUserWorkflowState]);
+  }, [user]); // Removed function dependency to prevent circular dependency
 
   // Load confirmers when user changes (removed driver name dependency to prevent infinite loop)
   useEffect(() => {
@@ -722,7 +722,7 @@ function App({ user = null }: AppProps) {
       logger.debug('User available, loading confirmers');
       loadAvailableConfirmers();
     }
-  }, [user, loadAvailableConfirmers]);
+  }, [user]); // Removed function dependency to prevent circular dependency
 
   // Auto-scroll to registration type selection when user logs in and data is loaded
   useEffect(() => {
