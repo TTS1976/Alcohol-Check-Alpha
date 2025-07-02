@@ -243,6 +243,9 @@ function App({ user = null }: AppProps) {
   
   // Ref for auto-scrolling to registration type selection
   const registrationTypeRef = useRef<HTMLDivElement>(null);
+  
+  // State for mobile navigation accordion
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Wrap functions in useCallback to prevent recreation on each render
 
@@ -1477,106 +1480,227 @@ function App({ user = null }: AppProps) {
                 </div>
               </div>
               
-              {/* Navigation Buttons - Modern Glass-morphism Design */}
+              {/* Navigation Buttons - Mobile Accordion & Desktop Grid */}
               <div className="space-y-3">
-                {/* Primary Action Row */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-3">
-                  {/* License Renewal */}
-                  {isRegisteredDriver === true && (
+                {/* Mobile Accordion Toggle - Only visible on mobile */}
+                <div className="md:hidden">
+                  <button
+                    onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+                    className="w-full backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-4 py-3 transition-all duration-300 shadow-lg"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                          <span className="text-lg">📱</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">メニュー</span>
+                      </div>
+                      <div className={`transform transition-transform duration-300 ${isMobileNavOpen ? 'rotate-180' : ''}`}>
+                        <span className="text-gray-500">▼</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Mobile Accordion Content */}
+                <div className={`md:hidden overflow-hidden transition-all duration-300 ${
+                  isMobileNavOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                }`}>
+                  <div className="space-y-2 p-2 bg-white/5 rounded-xl backdrop-blur-sm">
+                    {/* License Renewal - Mobile */}
+                    {isRegisteredDriver === true && (
+                      <button
+                        onClick={() => {
+                          window.open('https://forms.office.com/pages/responsepage.aspx?id=wgC36NrMpUi5DsfOZ75lRkZnbyGCmy1Kj4J4oLV_09FUNlVOVkxHSEYyRzVSNFZQUEhET0UzR08wOC4u', '_blank');
+                          setIsMobileNavOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-lg px-3 py-2.5 transition-all duration-300"
+                      >
+                        <div className="w-6 h-6 rounded-md bg-emerald-500/20 flex items-center justify-center">
+                          <span className="text-sm">📋</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">免許証更新</span>
+                      </button>
+                    )}
+                    
+                    {/* Approval Management - Mobile */}
                     <button
-                      onClick={() => window.open('https://forms.office.com/pages/responsepage.aspx?id=wgC36NrMpUi5DsfOZ75lRkZnbyGCmy1Kj4J4oLV_09FUNlVOVkxHSEYyRzVSNFZQUEhET0UzR08wOC4u', '_blank')}
+                      onClick={() => {
+                        setCurrentView('approvals');
+                        setIsMobileNavOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-lg px-3 py-2.5 transition-all duration-300"
+                    >
+                      <div className="w-6 h-6 rounded-md bg-orange-500/20 flex items-center justify-center">
+                        <span className="text-sm">✅</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">承認管理</span>
+                    </button>
+                    
+                    {/* Safety Management - Mobile */}
+                    <button
+                      onClick={() => {
+                        setCurrentView('safety');
+                        setIsMobileNavOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-lg px-3 py-2.5 transition-all duration-300"
+                    >
+                      <div className="w-6 h-6 rounded-md bg-blue-500/20 flex items-center justify-center">
+                        <span className="text-sm">🛡️</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-700">安全運転管理</span>
+                    </button>
+                    
+                    {/* Admin Actions - Mobile */}
+                    {isFullAdmin && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setCurrentView('admin');
+                            setIsMobileNavOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-lg px-3 py-2.5 transition-all duration-300"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-purple-500/20 flex items-center justify-center">
+                            <span className="text-sm">👤</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">ドライバー管理</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setCurrentView('tempcsv');
+                            setIsMobileNavOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-lg px-3 py-2.5 transition-all duration-300"
+                        >
+                          <div className="w-6 h-6 rounded-md bg-red-500/20 flex items-center justify-center">
+                            <span className="text-sm">🚨</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">一時CSV移行</span>
+                        </button>
+                      </>
+                    )}
+                    
+                    {/* Sign Out - Mobile */}
+                    <div className="pt-2 border-t border-white/10">
+                      <button
+                        onClick={() => {
+                          signOut();
+                          setIsMobileNavOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 backdrop-blur-md bg-gray-900/5 hover:bg-gray-900/10 border border-gray-200/50 hover:border-gray-300/50 rounded-lg px-3 py-2.5 transition-all duration-300"
+                      >
+                        <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center">
+                          <span className="text-sm">🚪</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">サインアウト</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Desktop Grid Layout - Hidden on mobile */}
+                <div className="hidden md:block">
+                  {/* Primary Action Row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-3">
+                    {/* License Renewal */}
+                    {isRegisteredDriver === true && (
+                      <button
+                        onClick={() => window.open('https://forms.office.com/pages/responsepage.aspx?id=wgC36NrMpUi5DsfOZ75lRkZnbyGCmy1Kj4J4oLV_09FUNlVOVkxHSEYyRzVSNFZQUEhET0UzR08wOC4u', '_blank')}
+                        className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                      >
+                        <div className="flex flex-col items-center gap-1.5 w-full">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
+                            <span className="text-lg">📋</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700 text-center leading-tight">
+                            <span className="block sm:hidden">免許更新</span>
+                            <span className="hidden sm:block">免許証更新</span>
+                          </span>
+                        </div>
+                      </button>
+                    )}
+                    
+                    {/* Approval Management */}
+                    <button
+                      onClick={() => setCurrentView('approvals')}
                       className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
                     >
                       <div className="flex flex-col items-center gap-1.5 w-full">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
-                          <span className="text-lg">📋</span>
+                        <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center group-hover:bg-orange-500/30 transition-colors">
+                          <span className="text-lg">✅</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 text-center leading-tight">承認管理</span>
+                      </div>
+                    </button>
+                    
+                    {/* Safety Management */}
+                    <button
+                      onClick={() => setCurrentView('safety')}
+                      className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                    >
+                      <div className="flex flex-col items-center gap-1.5 w-full">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
+                          <span className="text-lg">🛡️</span>
                         </div>
                         <span className="text-sm font-medium text-gray-700 text-center leading-tight">
-                          <span className="block sm:hidden">免許更新</span>
-                          <span className="hidden sm:block">免許証更新</span>
+                          <span className="block sm:hidden">安全管理</span>
+                          <span className="hidden sm:block">安全運転管理</span>
                         </span>
                       </div>
                     </button>
-                  )}
-                  
-                  {/* Approval Management */}
-                  <button
-                    onClick={() => setCurrentView('approvals')}
-                    className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
-                  >
-                    <div className="flex flex-col items-center gap-1.5 w-full">
-                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center group-hover:bg-orange-500/30 transition-colors">
-                        <span className="text-lg">✅</span>
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 text-center leading-tight">承認管理</span>
-                    </div>
-                  </button>
-                  
-                  {/* Safety Management */}
-                  <button
-                    onClick={() => setCurrentView('safety')}
-                    className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
-                  >
-                    <div className="flex flex-col items-center gap-1.5 w-full">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-                        <span className="text-lg">🛡️</span>
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 text-center leading-tight">
-                        <span className="block sm:hidden">安全管理</span>
-                        <span className="hidden sm:block">安全運転管理</span>
-                      </span>
-                    </div>
-                  </button>
-                  
-                  {/* Admin Actions */}
-                  {isFullAdmin && (
-                    <>
-                      <button
-                        onClick={() => setCurrentView('admin')}
-                        className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
-                      >
-                        <div className="flex flex-col items-center gap-1.5 w-full">
-                          <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
-                            <span className="text-lg">👤</span>
+                    
+                    {/* Admin Actions */}
+                    {isFullAdmin && (
+                      <>
+                        <button
+                          onClick={() => setCurrentView('admin')}
+                          className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                        >
+                          <div className="flex flex-col items-center gap-1.5 w-full">
+                            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
+                              <span className="text-lg">👤</span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 text-center leading-tight">
+                              <span className="block sm:hidden">ドライバー</span>
+                              <span className="hidden sm:block">ドライバー管理</span>
+                            </span>
                           </div>
-                          <span className="text-sm font-medium text-gray-700 text-center leading-tight">
-                            <span className="block sm:hidden">ドライバー</span>
-                            <span className="hidden sm:block">ドライバー管理</span>
-                          </span>
-                        </div>
-                      </button>
-                      
-                      <button
-                        onClick={() => setCurrentView('tempcsv')}
-                        className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
-                      >
-                        <div className="flex flex-col items-center gap-1.5 w-full">
-                          <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center group-hover:bg-red-500/30 transition-colors">
-                            <span className="text-lg">🚨</span>
+                        </button>
+                        
+                        <button
+                          onClick={() => setCurrentView('tempcsv')}
+                          className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                        >
+                          <div className="flex flex-col items-center gap-1.5 w-full">
+                            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center group-hover:bg-red-500/30 transition-colors">
+                              <span className="text-lg">🚨</span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 text-center leading-tight">
+                              <span className="block sm:hidden">CSV移行</span>
+                              <span className="hidden sm:block">一時CSV移行</span>
+                            </span>
                           </div>
-                          <span className="text-sm font-medium text-gray-700 text-center leading-tight">
-                            <span className="block sm:hidden">CSV移行</span>
-                            <span className="hidden sm:block">一時CSV移行</span>
-                          </span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Sign Out Row - Standalone */}
+                  <div className="flex justify-center lg:justify-end mt-3">
+                    <button
+                      onClick={signOut}
+                      className="group relative backdrop-blur-md bg-gray-900/5 hover:bg-gray-900/10 border border-gray-200/50 hover:border-gray-300/50 rounded-xl px-6 py-2.5 transition-all duration-300 hover:scale-[1.02] shadow-md hover:shadow-lg min-w-[140px]"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                          <span className="text-sm">🚪</span>
                         </div>
-                      </button>
-                    </>
-                  )}
-                </div>
-                
-                {/* Sign Out Row - Standalone */}
-                <div className="flex justify-center lg:justify-end">
-                  <button
-                    onClick={signOut}
-                    className="group relative backdrop-blur-md bg-gray-900/5 hover:bg-gray-900/10 border border-gray-200/50 hover:border-gray-300/50 rounded-xl px-6 py-2.5 transition-all duration-300 hover:scale-[1.02] shadow-md hover:shadow-lg min-w-[140px]"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-                        <span className="text-sm">🚪</span>
+                        <span className="text-sm font-medium text-gray-700">サインアウト</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-700">サインアウト</span>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
