@@ -80,7 +80,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const redirectResponse = await msalInstance.handleRedirectPromise();
         if (redirectResponse) {
-          console.log('Handled redirect response successfully');
           msalInstance.setActiveAccount(redirectResponse.account);
           
           // Build user profile after successful redirect login
@@ -99,15 +98,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
       } catch (redirectError) {
-        console.error('Error handling redirect:', redirectError);
         // Continue to check cached accounts
       }
 
       const accounts = msalInstance.getAllAccounts();
-      console.log('Checking auth state, found accounts:', accounts.length);
       
       if (accounts.length === 0) {
-        console.log('No cached accounts found, user needs to login');
         setAuthState({
           isAuthenticated: false,
           isLoading: false,
@@ -119,7 +115,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const account = accounts[0];
-      console.log('Found cached account:', account.username);
       msalInstance.setActiveAccount(account);
 
           // Test if tokens are still valid by trying to get an access token
@@ -128,9 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!token || token.length < 10) {
         throw new Error('Invalid token format');
       }
-      console.log('Tokens are valid, building user profile');
     } catch (tokenError) {
-      console.log('Tokens expired or invalid, clearing cache');
         await msalInstance.clearCache();
         setAuthState({
           isAuthenticated: false,
@@ -155,9 +148,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       setGraphService(tempGraphService);
-              console.log('User authenticated successfully');
     } catch (error) {
-      console.error('Auth state check failed:', error);
       // Clear cache if there's an error
       await msalInstance.clearCache();
       setAuthState({
@@ -177,7 +168,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Check if there's already an interaction in progress
       const inProgress = msalInstance.getActiveAccount();
       if (inProgress) {
-        console.log('Clearing existing state before new login');
         await msalInstance.clearCache();
         // Add small delay to ensure state is cleared
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -187,7 +177,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         await msalInstance.handleRedirectPromise();
       } catch (handleError) {
-        console.log('No redirect to handle or error handling redirect:', handleError);
+        // No redirect to handle or error handling redirect
       }
 
       let response;
@@ -200,8 +190,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // If popup is blocked or interaction_in_progress error, try redirect
         if (popupError.errorCode === 'interaction_in_progress' || 
             popupError.message?.includes('interaction_in_progress')) {
-          console.log('Interaction in progress detected, clearing and retrying...');
-          
           // Force clear any ongoing interactions
           await msalInstance.clearCache();
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -213,7 +201,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               prompt: 'select_account',
             });
           } catch (retryError) {
-            console.log('Popup retry failed, using redirect method');
             await msalInstance.loginRedirect({
               ...loginRequest,
               prompt: 'select_account',
@@ -291,9 +278,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             account: account,
             mainWindowRedirectUri: msalConfig.auth.postLogoutRedirectUri || undefined,
           });
-          console.log('Popup logout completed');
         } catch (logoutError: any) {
-          console.warn('Popup logout failed, trying redirect logout:', logoutError);
           
           // If popup logout fails, clear everything and use redirect
           try {
@@ -304,7 +289,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               postLogoutRedirectUri: msalConfig.auth.postLogoutRedirectUri || undefined,
             });
           } catch (redirectError) {
-            console.error('Redirect logout also failed:', redirectError);
             // Force clean state and reload
             window.location.reload();
           }
@@ -317,13 +301,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }, 500);
       
     } catch (error) {
-      console.error('Logout failed:', error);
-      
       // Force clear everything even if logout fails
       try {
         await msalInstance.clearCache();
       } catch (clearError) {
-        console.error('Final cache clear failed:', clearError);
+        // Final cache clear failed
       }
       
       // Reset state regardless
@@ -356,7 +338,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading: false,
       }));
     } catch (error) {
-      console.error('Failed to refresh user data:', error);
       setAuthState(prev => ({
         ...prev,
         isLoading: false,

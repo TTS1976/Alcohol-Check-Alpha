@@ -5,11 +5,11 @@
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
-// Get log level from environment variable, default to INFO for production
+// Get log level from environment variable, default to ERROR for production
 const getLogLevel = (): LogLevel => {
-  const envLevel = import.meta.env.VITE_LOG_LEVEL || 'INFO';
+  const envLevel = import.meta.env.VITE_LOG_LEVEL || 'ERROR';
   const validLevels: LogLevel[] = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
-  return validLevels.includes(envLevel as LogLevel) ? (envLevel as LogLevel) : 'INFO';
+  return validLevels.includes(envLevel as LogLevel) ? (envLevel as LogLevel) : 'ERROR';
 };
 
 const LOG_LEVEL = getLogLevel();
@@ -23,6 +23,11 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 };
 
 const shouldLog = (level: LogLevel): boolean => {
+  // In production, only log errors and only if explicitly enabled
+  const isDevelopment = import.meta.env.DEV;
+  if (!isDevelopment && level !== 'ERROR') {
+    return false;
+  }
   return LOG_LEVELS[level] >= LOG_LEVELS[LOG_LEVEL];
 };
 

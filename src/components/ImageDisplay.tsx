@@ -70,9 +70,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ fileName }) => {
         }),
       });
 
-      console.log('Invoking DirectCloud download Lambda function...');
       const response = await lambdaClient.send(command);
-      console.log('Lambda response status:', response.StatusCode);
 
       if (response.StatusCode === 200 && response.Payload) {
         const payload = JSON.parse(new TextDecoder().decode(response.Payload));
@@ -82,7 +80,6 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ fileName }) => {
 
         if (body.success && body.data) {
           const imageUrl = `data:${body.contentType || 'image/jpeg'};base64,${body.data}`;
-          console.log('Image data loaded successfully');
           setImageData(imageUrl);
         } else {
           setError(body.error || 'No image data received');
@@ -91,7 +88,6 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ fileName }) => {
         throw new Error(`Lambda invocation failed with status: ${response.StatusCode}`);
       }
     } catch (error) {
-      console.error('Download error:', error);
       setError('Failed to download image - この機能は一時的に制限されています');
     } finally {
       setLoading(false);

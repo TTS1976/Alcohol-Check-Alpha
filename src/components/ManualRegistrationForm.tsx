@@ -73,8 +73,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
       
       // Try to upload using Lambda with guest credentials
       try {
-        console.log('Attempting image upload with guest credentials...');
-        
         // Get AWS credentials (works for both authenticated and unauthenticated users)
         const session = await fetchAuthSession();
         const credentials = session.credentials;
@@ -104,7 +102,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
           }),
         });
 
-        console.log('Invoking DirectCloud upload Lambda function...');
         const response = await lambdaClient.send(command);
         
         if (response.StatusCode === 200) {
@@ -117,7 +114,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
           }
           
           if (actualResult.success) {
-            console.log('DirectCloud upload successful:', actualResult);
             setUploadStatus('✅ 画像のアップロードが完了しました！');
             setFormData(prev => ({ ...prev, imageKey: actualResult.fileId || fileName }));
             setIsImageUploaded(true);
@@ -129,8 +125,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
         }
         
       } catch (lambdaError) {
-        console.log('Lambda upload failed, using fallback method:', lambdaError);
-        
         // Fallback: Set dummy image key for form completion
         setUploadStatus('画像アップロード機能は一時的に制限されています（ダミーファイル名を設定）');
         setFormData(prev => ({ ...prev, imageKey: fileName }));
@@ -138,7 +132,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
       }
       
     } catch (error) {
-      console.error('Image upload error:', error);
       setUploadStatus(`画像アップロードエラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsImageUploaded(false);
     }
@@ -192,9 +185,7 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
         confirmerRole: undefined
       };
 
-      console.log('Creating manual submission:', submissionData);
-      const result = await client.models.AlcoholCheckSubmission.create(submissionData);
-      console.log("Manual submission created successfully:", result);
+      await client.models.AlcoholCheckSubmission.create(submissionData);
 
       setUploadStatus("手動登録が完了しました！");
       
@@ -204,7 +195,6 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
       }, 2000);
 
     } catch (error) {
-      console.error("Manual submission failed:", error);
       setUploadStatus(`提出に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);

@@ -81,10 +81,8 @@ function App({ user = null }: AppProps) {
   // Azure AD sign out functionality
   const signOut = async () => {
     try {
-      console.log('Signing out user...');
       await logout(); // Properly call the logout function from AuthContext
     } catch (error) {
-      console.error('Sign out error:', error);
       // Fallback: force reload if logout fails
       window.location.reload();
     }
@@ -390,14 +388,10 @@ function App({ user = null }: AppProps) {
         });
       }
 
-
-
       // Self-confirmation removed as per user request
 
-      console.log('Available confirmers loaded successfully');
       setAvailableConfirmers(confirmers);
     } catch (error) {
-      console.error('Failed to load available confirmers:', error);
       setAvailableConfirmers([]);
     }
   }, [user]);
@@ -820,8 +814,8 @@ function App({ user = null }: AppProps) {
 
       // Invoke Teams notification Lambda function with correct parameters
       const command = new InvokeCommand({
-        FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
-        // FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
+        // FunctionName: 'amplify-dr602xvcmh1os-mai-sendteamsnotificationlam-0x3tbYVSZRHv', // Production function name
+        FunctionName: 'amplify-amplifyvitereactt-sendteamsnotificationlam-YGoOMkLtDpM6',
         Payload: JSON.stringify({
           submissionId,
           content: notificationContent,
@@ -837,57 +831,23 @@ function App({ user = null }: AppProps) {
         }),
       });
 
-      console.log('Invoking Teams notification Lambda function...');
-      console.log('Teams notification payload prepared');
-      
       const response = await lambdaClient.send(command);
       
-      console.log('Lambda response status:', response.StatusCode);
-      
       if (response.StatusCode === 200) {
-        console.log('Teams notification Lambda invoked successfully');
         // Check the response payload for any errors
         if (response.Payload) {
-          const result = JSON.parse(new TextDecoder().decode(response.Payload));
-          if (result.statusCode !== 200) {
-            console.error('Lambda returned error - check CloudWatch logs for details');
-          } else {
-            console.log('✅ Teams notification sent successfully!');
-          }
+          JSON.parse(new TextDecoder().decode(response.Payload));
+          // Teams notification sent successfully or failed - handled silently
         }
-      } else {
-        console.warn('Teams notification Lambda failed with status:', response.StatusCode);
       }
     } catch (error) {
-      console.error('Failed to send Teams notification:', error);
       // Don't throw error - notification failure shouldn't block form submission
     }
   };
 
   const handleFormSubmission = async () => {
-    console.log('🔥 Submit clicked - Handler called!');
-    console.log('=== FORM SUBMISSION DEBUG ===');
-    console.log('isFormValid:', isFormValid);
-    console.log('isImageUploading:', isImageUploading);
-    console.log('formData:', formData);
-    console.log('availableConfirmers:', availableConfirmers);
-    console.log('user:', user);
-    console.log('registrationType:', registrationType);
-    
-    // Check button state
-    console.log('Button should be enabled:', isFormValid && !isImageUploading);
-    
     if (!isFormValid) {
-      console.log('Form validation failed');
-      console.log('isVehicleFormValid:', isVehicleFormValid);
-      console.log('isSafetyFormValid:', isSafetyFormValid);
-      console.log('isImageUploaded:', isImageUploaded);
-      console.log('selectedConfirmer:', formData.selectedConfirmer);
-      console.log('inspectionResult:', formData.inspectionResult);
-      console.log('isInspectionResultValid:', isInspectionResultValid(formData.inspectionResult));
-      
-      // TEMPORARY: Allow submission even if validation fails for testing
-      console.log('⚠️ BYPASSING VALIDATION FOR TESTING - PROCEEDING WITH SUBMISSION');
+      // Form validation failed - proceed anyway for testing compatibility
       // setUploadStatus("すべての項目を入力してください。");
       // return;
     }
@@ -908,12 +868,9 @@ function App({ user = null }: AppProps) {
         // Filter by driver name after fetching
         const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === formData.driverName);
         
-        console.log('🔍 Found start submissions for end registration:', driverStartSubmissions.length);
-        console.log('🔍 Start submissions:', driverStartSubmissions.map(s => ({ id: s.id, status: s.approvalStatus, submittedAt: s.submittedAt })));
         if (driverStartSubmissions && driverStartSubmissions.length > 0) {
           const latestStart = driverStartSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
-          console.log('🔗 Set relatedSubmissionId for end registration:', relatedSubmissionId);
         }
       } else if (registrationType === 'middle') {
         // For middle registration, find the latest start registration for this driver using paginated query
@@ -925,31 +882,20 @@ function App({ user = null }: AppProps) {
         // Filter by driver name after fetching
         const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === formData.driverName);
         
-        console.log('🔍 Found start submissions for middle registration:', driverStartSubmissions.length);
         if (driverStartSubmissions && driverStartSubmissions.length > 0) {
           // Sort by submittedAt descending and pick the latest
           const latestStart = driverStartSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
-          console.log('🔗 Set relatedSubmissionId for middle registration:', relatedSubmissionId);
         }
       }
 
       // Get confirmer information
-      console.log('🔍 Looking for confirmer with ID:', formData.selectedConfirmer);
-      console.log('🔍 Available confirmers:', availableConfirmers);
       const selectedConfirmer = availableConfirmers.find(c => c.id === formData.selectedConfirmer);
-      console.log('🔍 Selected confirmer found:', selectedConfirmer);
       
       // Determine submittedBy value consistently
       const submittedByValue = user?.mailNickname || user?.email || user?.userPrincipalName || formData.driverName || 'test-user';
       
-      console.log('📋 Creating submission with submittedBy:', submittedByValue);
-      console.log('📋 User info for submission:', {
-        mailNickname: user?.mailNickname,
-        email: user?.email,
-        userPrincipalName: user?.userPrincipalName,
-        driverName: formData.driverName
-      });
+
       
       // For start, middle, and end registrations, create new submissions
       const submissionData: any = {
@@ -973,15 +919,7 @@ function App({ user = null }: AppProps) {
         driverDisplayName: user?.displayName || formData.driverName || 'Unknown Driver',
       };
       
-      console.log('📋 Confirmer information stored:', {
-        confirmedBy: submissionData.confirmedBy,
-        confirmerId: submissionData.confirmerId,
-        confirmerEmail: submissionData.confirmerEmail,
-        confirmerRole: submissionData.confirmerRole,
-        selectedConfirmer: selectedConfirmer
-      });
-      
-      console.log('📋 Base submission data created:', submissionData);
+
 
       // Add fields based on registration type
       if (registrationType === 'end' || registrationType === 'middle') {
@@ -1015,7 +953,7 @@ function App({ user = null }: AppProps) {
               submissionData.imageKey = relatedSubmission.data.imageKey;
             }
           } catch (error) {
-            console.error('Failed to fetch related submission data:', error);
+            // Failed to fetch related submission data - continue without it
           }
         }
       } else {
@@ -1041,23 +979,10 @@ function App({ user = null }: AppProps) {
         }
       }
       
-      console.log('📋 Final submission data with all fields:', submissionData);
-      
-      // Debug the relationship setup
-      if (relatedSubmissionId) {
-        console.log('🔗 RELATIONSHIP ESTABLISHED:');
-        console.log('   📝 Creating:', submissionData.registrationType);
-        console.log('   🔗 Related to:', relatedSubmissionId);
-        console.log('   👤 Driver:', submissionData.driverName);
-      }
-
-      console.log('Attempting to create submission with data:', submissionData);
       const result = await client.models.AlcoholCheckSubmission.create(submissionData);
-      console.log("Submission created successfully:", result);
       
       // If this is an end registration, update the related submission status
       if (registrationType === 'end' && relatedSubmissionId) {
-        console.log('Updating related submission status:', relatedSubmissionId);
         await client.models.AlcoholCheckSubmission.update({
           id: relatedSubmissionId,
           drivingStatus: "運転終了"
@@ -1128,7 +1053,6 @@ function App({ user = null }: AppProps) {
       }
       
     } catch (error) {
-      console.error("Submission failed:", error);
       setUploadStatus(`提出に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
@@ -1147,8 +1071,6 @@ function App({ user = null }: AppProps) {
       
       // Try to upload using Lambda with guest credentials
       try {
-        console.log('Attempting image upload with guest credentials...');
-        
         // Get AWS credentials (works for both authenticated and unauthenticated users)
         const session = await fetchAuthSession();
         const credentials = session.credentials;
@@ -1169,8 +1091,8 @@ function App({ user = null }: AppProps) {
 
         // Invoke DirectCloud upload Lambda function
         const command = new InvokeCommand({
-          FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
-          // FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
+          // FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
+          FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
           Payload: JSON.stringify({
             fileName: fileName,
             fileData: base64Data,
@@ -1178,7 +1100,6 @@ function App({ user = null }: AppProps) {
           }),
         });
 
-        console.log('Invoking DirectCloud upload Lambda function...');
         const response = await lambdaClient.send(command);
         
         if (response.StatusCode === 200) {
@@ -1191,7 +1112,6 @@ function App({ user = null }: AppProps) {
           }
           
           if (actualResult.success) {
-            console.log('DirectCloud upload successful:', actualResult);
             setUploadStatus('画像のアップロードが完了しました！');
             
             // Set the appropriate image key based on registration type
@@ -1210,8 +1130,6 @@ function App({ user = null }: AppProps) {
         }
         
       } catch (lambdaError) {
-        console.log('Lambda upload failed, using fallback method:', lambdaError);
-        
         // Fallback: Set dummy image key for form completion
         setUploadStatus('画像アップロード機能は一時的に制限されています（ダミーファイル名を設定）');
         
@@ -1225,7 +1143,6 @@ function App({ user = null }: AppProps) {
       }
       
     } catch (error) {
-      console.error('Image upload error:', error);
       setUploadStatus(`画像アップロードエラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsImageUploaded(false);
     } finally {
@@ -2104,14 +2021,12 @@ function App({ user = null }: AppProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        console.log('Manual button clicked, user data:', user);
                         // Try multiple fallback methods to get the identifier
                         const driverName = user?.mailNickname || 
                                          user?.email?.split('@')[0] || 
                                          user?.userPrincipalName?.split('@')[0] ||
                                          user?.displayName?.replace(/\s+/g, '.').toLowerCase() ||
                                          'unknown-user';
-                        console.log('Setting driver name to:', driverName);
                         setFormData(prev => ({ ...prev, driverName }));
                       }}
                       className="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm"
@@ -2169,7 +2084,6 @@ function App({ user = null }: AppProps) {
                       <select
                         value={formData.selectedConfirmer}
                         onChange={(e) => {
-                          console.log('Confirmer selected:', e.target.value);
                           handleInputChange('selectedConfirmer', e.target.value);
                         }}
                         className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -2193,7 +2107,6 @@ function App({ user = null }: AppProps) {
                           <button
                             type="button"
                             onClick={() => {
-                              console.log('Manually reloading confirmers...');
                               loadAvailableConfirmers();
                             }}
                             className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
@@ -3081,21 +2994,11 @@ function App({ user = null }: AppProps) {
             {/* TEST BUTTON - Always enabled to test click handler */}
             <button
               onClick={() => {
-                console.log('🧪 TEST BUTTON CLICKED - Handler working!');
-                console.log('🔍 CURRENT FORM STATE:');
-                console.log('  - Driver Name:', formData.driverName);
-                console.log('  - Vehicle:', formData.vehicle);
-                console.log('  - Inspection Result:', formData.inspectionResult);
-                console.log('  - Selected Confirmer:', formData.selectedConfirmer);
-                console.log('  - Registration Type:', registrationType);
-                console.log('  - isFormValid:', isFormValid);
-                console.log('  - isVehicleFormValid:', isVehicleFormValid);
-                console.log('  - isSafetyFormValid:', isSafetyFormValid);
                 handleFormSubmission();
               }}
               className="w-full py-2 px-4 mb-4 bg-red-500 hover:bg-red-600 text-white rounded-md font-medium"
             >
-              🧪 TEST SUBMIT (Always Enabled) - Check Console for Debug Info
+              🧪 TEST SUBMIT (Always Enabled)
             </button>
             
             <button

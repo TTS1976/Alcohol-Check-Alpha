@@ -41,8 +41,6 @@ export class GraphService {
         .select('id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,mobilePhone,businessPhones,officeLocation,employeeId,mailNickname')
         .get();
       
-              console.log('Successfully retrieved user data from Graph API');
-      
       return {
         id: user.id,
         displayName: user.displayName,
@@ -59,7 +57,6 @@ export class GraphService {
         mailNickname: user.mailNickname || user.userPrincipalName?.split('@')[0] || '', // Extract from email if mailNickname not available
       };
     } catch (error) {
-      console.error('Error fetching user profile:', error);
       throw error;
     }
   }
@@ -82,10 +79,8 @@ export class GraphService {
     } catch (error: any) {
       // Manager might not exist or user might not have permission
       if (error?.code === 'Request_ResourceNotFound' || error?.message?.includes('does not exist')) {
-        console.info('No manager assigned to this user in Azure AD');
         return null;
       }
-      console.warn('Could not fetch manager:', error);
       return null;
     }
   }
@@ -106,7 +101,6 @@ export class GraphService {
         mailNickname: report.mailNickname || report.mail?.split('@')[0] || '',
       }));
     } catch (error) {
-      console.warn('Could not fetch direct reports:', error);
       return [];
     }
   }
@@ -128,7 +122,6 @@ export class GraphService {
         department: user.department || '',
       }));
     } catch (error) {
-      console.warn('Could not fetch department users:', error);
       return [];
     }
   }
@@ -137,7 +130,6 @@ export class GraphService {
   async checkSafeDrivingManagerRole(_userId: string): Promise<boolean> {
     // TODO: Implement database call to check SafeDrivingManager role
     // For now, return false. You'll need to implement this based on your database
-    console.log('Checking SafeDrivingManager role for user');
     return false;
   }
 
@@ -163,11 +155,8 @@ export class GraphService {
   // Build complete user profile with hierarchy and permissions
   async buildAppUser(account: AccountInfo): Promise<AppUser> {
     try {
-      console.log('Building app user for account:', account.username);
-      
       // Get user profile
       const userProfile = await this.getUserProfile();
-      console.log('User profile fetched successfully');
       
       // Get manager and direct reports
       const [manager, directReports] = await Promise.all([
@@ -217,11 +206,8 @@ export class GraphService {
         sessionId: account.homeAccountId,
       };
 
-      console.log('App user built successfully');
-
       return result;
     } catch (error) {
-      console.error('Failed to build app user:', error);
       throw new Error(`Failed to build user profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -251,7 +237,7 @@ export class GraphService {
           const departmentUsers = await this.getDepartmentUsers(user.department);
           confirmers.push(...departmentUsers.map(u => u.id));
         } catch (error) {
-          console.warn('Could not fetch department users for SafeDrivingManager');
+          // Could not fetch department users for SafeDrivingManager
         }
       }
     }
@@ -357,7 +343,6 @@ export class GraphService {
 
       return '不明な車両';
     } catch (error) {
-      console.warn('Could not resolve vehicle ID:', vehicleId, error);
       return '不明な車両';
     }
   }
@@ -413,7 +398,6 @@ export class GraphService {
             cleanName: response.displayName ? this.removeVehiclePrefix(response.displayName) : '不明な車両'
           };
         } catch (error) {
-          console.warn('Could not resolve vehicle ID:', id, error);
           return { id, cleanName: '不明な車両' };
         }
       });
@@ -426,7 +410,6 @@ export class GraphService {
       });
 
     } catch (error) {
-      console.error('Error in bulk vehicle ID resolution:', error);
       // Fill remaining IDs with fallback
       idsToResolve.forEach(id => {
         if (!results[id]) {

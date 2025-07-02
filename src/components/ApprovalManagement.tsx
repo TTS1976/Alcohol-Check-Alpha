@@ -362,7 +362,6 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       setStatus(`申請 ${submissionId} を承認しました`);
       setTimeout(() => setStatus(''), 3000);
     } catch (error) {
-      console.error('Approval failed:', error);
       setStatus('承認処理に失敗しました');
     }
   };
@@ -408,7 +407,6 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       setStatus(`申請 ${submissionId} を却下しました`);
       setTimeout(() => setStatus(''), 3000);
     } catch (error) {
-      console.error('Rejection failed:', error);
       setStatus('却下処理に失敗しました');
     }
   };
