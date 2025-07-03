@@ -665,11 +665,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
                       )}
 
                       {/* Image */}
-                      {submission.imageKey && (
+                      {(submission.registrationType === '運転終了登録' || submission.registrationType === '中間点呼登録' ? submission.imageKeyEnd : submission.imageKey) && (
                         <div className="md:col-span-2">
                           <h4 className="font-semibold text-gray-900 mb-3">確認写真</h4>
                           <ImageDisplay 
-                            fileName={submission.imageKey}
+                            fileName={submission.registrationType === '運転終了登録' || submission.registrationType === '中間点呼登録' ? submission.imageKeyEnd : submission.imageKey}
                           />
                         </div>
                       )}
