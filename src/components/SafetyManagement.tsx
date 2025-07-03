@@ -99,7 +99,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
         // Delay slightly to ensure any recent submissions are available
         setTimeout(() => {
           loadInitialSubmissions(true);
-        }, 1500);
+        }, 600000);
       }
     };
 
