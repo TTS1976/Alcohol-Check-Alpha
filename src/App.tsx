@@ -1088,7 +1088,7 @@ function App({ user = null }: AppProps) {
       const base64Data = imageData.split(',')[1];
       
       // Create a unique filename using timestamp
-      const fileName = `alcohol_check_${Date.now()}.jpg`;
+      const fileName = `${user?.mailNickname || 'unknown'}_${Date.now()}.jpg`;
       
       // Try to upload using Lambda with guest credentials
       try {
