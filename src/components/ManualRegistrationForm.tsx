@@ -93,8 +93,7 @@ const ManualRegistrationForm: React.FC<ManualRegistrationFormProps> = ({ user, o
 
         // Invoke DirectCloud upload Lambda function
         const command = new InvokeCommand({
-          //FunctionName: 'amplify-dr602xvcmh1os-mai-directclouduploadlambdaA-ZQQjflHl7Gaz', //production
-          FunctionName: 'amplify-amplifyvitereactt-directclouduploadlambdaA-hLrq8liOhMFo', //staging
+          FunctionName: import.meta.env.VITE_LAMBDA_DIRECTCLOUD_UPLOAD!,
           Payload: JSON.stringify({
             fileName: fileName,
             fileData: base64Data,

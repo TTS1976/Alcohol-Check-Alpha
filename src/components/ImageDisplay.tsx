@@ -63,11 +63,10 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ fileName }) => {
 
       // Invoke DirectCloud download Lambda function
       const command = new InvokeCommand({
-          FunctionName: 'amplify-dr602xvcmh1os-mai-directclouddownloadlambd-NbekozPO2WEQ', //production 
-          // FunctionName: 'amplify-amplifyvitereactt-directclouddownloadlambd-aPw4nKclFnMd', //staging
-        Payload: JSON.stringify({
-          fileName: fileName
-        }),
+          FunctionName: import.meta.env.VITE_LAMBDA_DIRECTCLOUD_DOWNLOAD!,
+          Payload: JSON.stringify({
+            fileName: fileName
+          }),
       });
 
       const response = await lambdaClient.send(command);

@@ -4,8 +4,8 @@ import { logger } from '../utils/logger';
 // Azure AD Configuration
 export const msalConfig: Configuration = {
   auth: {
-    clientId: import.meta.env.VITE_AZURE_CLIENT_ID || '9aa3d256-5e02-402e-a381-d91350dc9690',
-    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID || 'e8b700c2-ccda-48a5-b90e-c7ce67be6546'}`,
+    clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
+    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`,
     redirectUri: import.meta.env.VITE_REDIRECT_URI || (import.meta.env.DEV ? 'http://localhost:5173/auth/callback' : 'https://tts-group.jp/auth/callback'),
     postLogoutRedirectUri: import.meta.env.VITE_POST_LOGOUT_REDIRECT_URI || (import.meta.env.DEV ? 'http://localhost:5173' : 'https://tts-group.jp'),
   },
