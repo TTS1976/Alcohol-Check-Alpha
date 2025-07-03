@@ -315,4 +315,48 @@ export async function getSubmissionsSorted(options: {
     const comparison = new Date(aValue).getTime() - new Date(bValue).getTime();
     return sortOrder === 'desc' ? -comparison : comparison;
   });
+}
+
+/**
+ * Efficiently query submissions by confirmerId and approvalStatus using the GSI
+ */
+export async function getSubmissionsByConfirmerPaginated(options: {
+  confirmerId: string;
+  approvalStatus?: string;
+  limit?: number;
+  nextToken?: string;
+  sortDirection?: 'ASC' | 'DESC';
+}): Promise<PaginatedResult<Schema["AlcoholCheckSubmission"]["type"]>> {
+  const { confirmerId, approvalStatus = 'PENDING', limit = 50, nextToken, sortDirection = 'DESC' } = options;
+
+  // The generated query will be listAlcoholCheckSubmissionByConfirmerIdAndApprovalStatus
+  const queryOptions: any = {
+    confirmerId,
+    approvalStatus,
+    limit,
+    sortDirection,
+  };
+  if (nextToken) queryOptions.nextToken = nextToken;
+
+  logger.debug(`Querying AlcoholCheckSubmission by confirmerId=${confirmerId}, approvalStatus=${approvalStatus}`);
+
+  // Use the generated GSI query
+  const result = await client.models.AlcoholCheckSubmission.listAlcoholCheckSubmissionByConfirmerIdAndApprovalStatus(queryOptions);
+
+  if (!result.data) {
+    logger.warn(`No data returned for confirmerId: ${confirmerId}`);
+    return {
+      items: [],
+      hasMore: false
+    };
+  }
+
+  const items = result.data as Schema["AlcoholCheckSubmission"]["type"][];
+  logger.debug(`Loaded ${items.length} submissions for confirmerId: ${confirmerId}`);
+
+  return {
+    items,
+    nextToken: result.nextToken ?? undefined,
+    hasMore: !!result.nextToken
+  };
 } 

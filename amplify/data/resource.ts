@@ -74,6 +74,10 @@ const schema = a.schema({
 
       teamsNotificationSent: a.boolean().required(),
     })
+    .secondaryIndexes((index) => [
+      index('confirmerId').sortKeys(['approvalStatus']),
+      index('submittedBy').sortKeys(['submittedAt'])
+    ])
     .authorization((allow) => [allow.publicApiKey()]),
 
   // New Driver model

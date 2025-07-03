@@ -3,7 +3,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
-import { getSubmissionsPaginated, getDriversPaginated } from '../utils/paginationHelper';
+import { getSubmissionsPaginated, getDriversPaginated, getSubmissionsByConfirmerPaginated } from '../utils/paginationHelper';
 import { logger } from '../utils/logger';
 
 import { isKachoLevel } from '../config/authConfig';
@@ -20,8 +20,7 @@ interface ApprovalManagementProps {
 const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user }) => {
   const { checkUserRole, graphService } = useAuth();
   
-  // Constants
-  const MAX_RETRIES = 3; // Maximum number of retry attempts for data consistency
+
   
   // Server-side pagination state
   const [nextToken, setNextToken] = useState<string | undefined>();
@@ -81,56 +80,39 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   }, []);
 
     // NEW: Load initial pending submissions with pagination
-  const loadPendingSubmissions = async (showRefreshStatus = true, retryCount = 0) => {
+  const loadPendingSubmissions = async (showRefreshStatus = true) => {
     setIsLoading(true);
     try {
       if (showRefreshStatus) {
         setStatus('承認待ち申請を読み込み中...');
       }
-      
       logger.info('Loading pending submissions with server-side pagination...');
-      
-      // FIX: Use the same approach as debug query to avoid AWS Amplify filter inconsistency
-      // Query ALL submissions first, then filter in memory for PENDING status
-      const result = await getSubmissionsPaginated({
-        limit: 200, // Increase limit to capture more pending submissions in first load
-        sortDirection: 'DESC' // Ensure latest submissions come first
-      });
-      
-      // Filter for PENDING submissions in memory (this bypasses AWS Amplify query filter issues)
-      const pendingSubmissions = result.items.filter(sub => sub.approvalStatus === 'PENDING');
-      
-      logger.info(`Loaded ${result.items.length} total submissions, ${pendingSubmissions.length} pending submissions by registration type:`, 
-        pendingSubmissions.reduce((acc: Record<string, number>, sub) => {
-          acc[sub.registrationType] = (acc[sub.registrationType] || 0) + 1;
-          return acc;
-        }, {})
-      );
-      
-      // Check if we're missing expected submission types and retry if needed
-      const registrationTypes = pendingSubmissions.reduce((acc: Record<string, boolean>, sub) => {
-        acc[sub.registrationType] = true;
-        return acc;
-      }, {});
-      
-      const hasOnlyStartRegistrations = Object.keys(registrationTypes).length === 1 && 
-                                      registrationTypes['運転開始登録'] === true;
-      
-      // If we only have start registrations and this might be a consistency issue, retry
-      if (hasOnlyStartRegistrations && pendingSubmissions.length > 0 && retryCount < MAX_RETRIES) {
-        logger.warn(`Only found 運転開始登録 submissions, retrying in 2 seconds... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-        setTimeout(() => {
-          loadPendingSubmissions(false, retryCount + 1);
-        }, 2000);
-        return;
+      let result;
+      if (checkUserRole('SafeDrivingManager')) {
+        // Admin: fetch all pending submissions
+        result = await getSubmissionsPaginated({
+          approvalStatus: 'PENDING',
+          limit: 200,
+          sortDirection: 'DESC'
+        });
+      } else {
+        // Non-admin: fetch only submissions where user is confirmer
+        const userIdentifier = user?.mailNickname || user?.email || user?.id || user?.objectId || user?.azureId;
+        if (!userIdentifier) throw new Error('Unable to determine user identifier for confirmer query');
+        result = await getSubmissionsByConfirmerPaginated({
+          confirmerId: userIdentifier,
+          approvalStatus: 'PENDING',
+          limit: 200,
+          sortDirection: 'DESC'
+        });
       }
-      
+      const pendingSubmissions = result.items;
+      logger.info(`Loaded ${pendingSubmissions.length} pending submissions`);
       setPendingSubmissions(pendingSubmissions);
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
       setTotalLoaded(pendingSubmissions.length);
-      setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました (${Object.keys(registrationTypes).join(', ')})${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
-      
+      setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
     } catch (error) {
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -142,36 +124,37 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   // NEW: Load more submissions when user clicks "Load More"
   const loadMoreSubmissions = async () => {
     if (!hasMore || isLoading) return;
-    
     setIsLoading(true);
     try {
       logger.debug('Loading more submissions...');
       setStatus('過去の承認待ち申請を読み込み中...');
-      
-      const result = await getSubmissionsPaginated({
-        limit: 50,
-        nextToken: nextToken,
-        sortDirection: 'DESC' // Continue loading older submissions
-      });
-      
-      // Filter for PENDING submissions in memory
-      const newPendingSubmissions = result.items.filter(sub => sub.approvalStatus === 'PENDING');
-      
-      logger.debug(`Loaded ${result.items.length} additional submissions, ${newPendingSubmissions.length} pending`);
-      
+      let result;
+      if (checkUserRole('SafeDrivingManager')) {
+        result = await getSubmissionsPaginated({
+          approvalStatus: 'PENDING',
+          limit: 50,
+          nextToken: nextToken,
+          sortDirection: 'DESC'
+        });
+      } else {
+        const userIdentifier = user?.mailNickname || user?.email || user?.id || user?.objectId || user?.azureId;
+        if (!userIdentifier) throw new Error('Unable to determine user identifier for confirmer query');
+        result = await getSubmissionsByConfirmerPaginated({
+          confirmerId: userIdentifier,
+          approvalStatus: 'PENDING',
+          limit: 50,
+          nextToken: nextToken,
+          sortDirection: 'DESC'
+        });
+      }
+      const newPendingSubmissions = result.items;
+      logger.debug(`Loaded ${newPendingSubmissions.length} additional pending submissions`);
       const allPendingSubmissions = [...pendingSubmissions, ...newPendingSubmissions];
       setPendingSubmissions(allPendingSubmissions);
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
       setTotalLoaded(prev => prev + newPendingSubmissions.length);
-      
-      const registrationTypes = allPendingSubmissions.reduce((acc: Record<string, boolean>, sub) => {
-        acc[sub.registrationType] = true;
-        return acc;
-      }, {});
-      
-      setStatus(`✅ ${allPendingSubmissions.length}件の承認待ち申請を読み込みました (${Object.keys(registrationTypes).join(', ')})${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
-      
+      setStatus(`✅ ${allPendingSubmissions.length}件の承認待ち申請を読み込みました${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
     } catch (error) {
       logger.error('Failed to load more submissions:', error);
       setStatus('追加データの読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));

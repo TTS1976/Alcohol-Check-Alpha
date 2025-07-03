@@ -5,6 +5,7 @@ import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
 import { getSubmissionsPaginated, getDriversPaginated } from '../utils/paginationHelper';
 import { logger } from '../utils/logger';
+import { ADMIN_DEPARTMENTS } from '../config/authConfig';
 
 
 // Configure client to use API key for public access
@@ -30,7 +31,7 @@ interface SubmissionGroup {
 }
 
 const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user }) => {
-  const { graphService } = useAuth();
+  const { user, checkUserRole, graphService } = useAuth();
   
   // Server-side pagination state
   const [currentSubmissions, setCurrentSubmissions] = useState<any[]>([]);
@@ -64,6 +65,9 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
 
   // Temporarily bypass admin check for authentication removal
   // const isAdmin = true; // user?.signInDetails?.loginId === "tts-driver-admin@teral.co.jp" || user?.username === "tts-driver-admin@teral.co.jp" || user?.signInDetails?.loginId === "tts-driver@teral.co.jp" || user?.username === "tts-driver@teral.co.jp";
+
+  const isAdmin = checkUserRole('SafeDrivingManager') || 
+                  (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept)));
 
   useEffect(() => {
     loadInitialSubmissions(false); // Don't show refresh status on initial load
@@ -118,8 +122,9 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       // FIX: Use the same approach as ApprovalManagement to avoid AWS Amplify filter inconsistency
       // Query ALL submissions first, then filter in memory
       const result = await getSubmissionsPaginated({
-        limit: 100, // Get more submissions to ensure we catch all recent ones
-        sortDirection: 'DESC' // Ensure latest submissions come first
+        ...(isAdmin ? {} : { submittedBy: user?.mailNickname || user?.email }),
+        limit: 100,
+        sortDirection: 'DESC'
       });
       
       // Filter for non-rejected submissions in memory (this bypasses AWS Amplify query filter issues)
@@ -174,6 +179,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       setStatus('過去の申請データを読み込み中...');
       
       const result = await getSubmissionsPaginated({
+        ...(isAdmin ? {} : { submittedBy: user?.mailNickname || user?.email }),
         limit: 50,
         nextToken: nextToken,
         excludeRejected: true,
@@ -210,7 +216,8 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       
       // FIX: Query ALL submissions first, then filter in memory to avoid AWS Amplify inconsistency
       const result = await getSubmissionsPaginated({
-        limit: 100 // Load more when filtering
+        ...(isAdmin ? {} : { submittedBy: user?.mailNickname || user?.email }),
+        limit: 100
       });
       
       // Apply status filter in memory
