@@ -22,7 +22,7 @@ import teralSafetyIcon from './assets/teralsafety.png';
 import './App.css';
 
 // Import pagination helpers
-import { getAllDrivers, getAllSubmissions } from './utils/paginationHelper';
+import { getAllDrivers, getAllSubmissions, getSubmissionsByConfirmerPaginated } from './utils/paginationHelper';
 import { logger } from './utils/logger';
 
 import { ADMIN_DEPARTMENTS } from './config/authConfig';
@@ -71,7 +71,7 @@ interface AppProps {
 }
 
 function App({ user = null }: AppProps) {
-  const { graphService, logout } = useAuth();
+  const { graphService, logout, checkUserRole } = useAuth();
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'main' | 'admin' | 'vehicles' | 'submissions' | 'safety' | 'approvals' | 'tempcsv'>('main');
   const [registrationType, setRegistrationType] = useState<'start' | 'middle' | 'end' | 'manual' | null>(null);
@@ -140,6 +140,10 @@ function App({ user = null }: AppProps) {
     canDoIntermediate: boolean;
     isComplete: boolean;
   } | null>(null);
+  
+  // Approval status management
+  const [pendingApprovalCount, setPendingApprovalCount] = useState<number>(0);
+  const [isApprovalLoading, setIsApprovalLoading] = useState(false);
   const purposeOptions = ['営業', '現地調査', '現場監督', '緊急対応', 'その他'];
 
   // Driving rules options
@@ -588,6 +592,55 @@ function App({ user = null }: AppProps) {
     }
   }, [user]);
 
+  // Function to check for pending approval requests
+  const checkPendingApprovals = useCallback(async () => {
+    if (!user) {
+      setPendingApprovalCount(0);
+      return;
+    }
+
+    try {
+      setIsApprovalLoading(true);
+      logger.debug('Checking for pending approval requests...');
+      
+      const userIdentifier = user?.mailNickname || user?.email || user?.id || user?.objectId || user?.azureId;
+      if (!userIdentifier) {
+        logger.warn('Unable to determine user identifier for approval check');
+        setPendingApprovalCount(0);
+        return;
+      }
+
+      // Check if user is a SafeDrivingManager (can see all pending submissions)
+      const isSafeDrivingManager = checkUserRole('SafeDrivingManager');
+      
+      let result;
+      if (isSafeDrivingManager) {
+        // Admin: fetch all pending submissions
+        const allPending = await getAllSubmissions({
+          approvalStatus: 'PENDING',
+          maxItems: 1000
+        });
+        result = { items: allPending };
+      } else {
+        // Non-admin: fetch only submissions where user is confirmer
+        result = await getSubmissionsByConfirmerPaginated({
+          confirmerId: userIdentifier,
+          approvalStatus: 'PENDING',
+          limit: 1000
+        });
+      }
+      
+      const pendingCount = result.items.length;
+      logger.debug(`Found ${pendingCount} pending approval requests`);
+      setPendingApprovalCount(pendingCount);
+    } catch (error) {
+      logger.error('Failed to check pending approvals:', error);
+      setPendingApprovalCount(0);
+    } finally {
+      setIsApprovalLoading(false);
+    }
+  }, [user, checkUserRole]);
+
   // Add this useEffect for the clock timer after the existing useEffect
   useEffect(() => {
     const timer = setInterval(() => {
@@ -713,6 +766,7 @@ function App({ user = null }: AppProps) {
   useEffect(() => {
     if (user && user.mailNickname) {
       checkUserWorkflowState();
+      checkPendingApprovals();
     }
   }, [user]); // Removed function dependency to prevent circular dependency
 
@@ -1044,6 +1098,7 @@ function App({ user = null }: AppProps) {
       
       // Refresh workflow state after successful submission
       await checkUserWorkflowState();
+      await checkPendingApprovals();
       
       // Show success message and redirect to home after 2 seconds
       setTimeout(() => {
@@ -1642,6 +1697,48 @@ function App({ user = null }: AppProps) {
               </div>
             </div>
           </div>
+
+          {/* Approval Status Section */}
+          {user && (
+            <div className="relative w-full mb-6">
+              <div className="flex items-center justify-center">
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-4 shadow-xl border border-white/20 max-w-md w-full">
+                  <div className="text-center text-white space-y-2">
+                    {isApprovalLoading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span className="text-sm">承認状況を確認中...</span>
+                      </div>
+                    ) : pendingApprovalCount > 0 ? (
+                      <>
+                        <div className="text-lg font-medium">
+                          現在の状態: 承認待ち申請があります
+                        </div>
+                        <div className="text-sm opacity-90">
+                          {pendingApprovalCount}件の承認待ち申請があります。
+                        </div>
+                        <button
+                          onClick={() => setCurrentView('approvals')}
+                          className="mt-2 bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-lg transition-all duration-300"
+                        >
+                          承認管理で確認する
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-lg font-medium">
+                          現在の状態: 承認待ち申請はありません
+                        </div>
+                        <div className="text-sm opacity-90">
+                          新しい運転を開始できます。
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Digital Clock */}
           <div className="relative w-full mb-8">
