@@ -612,11 +612,11 @@ function App({ user = null }: AppProps) {
   // Separate useEffect to ensure driver name is populated when user data becomes available
   useEffect(() => {
     if (user && !formData.driverName && !driverNameSetRef.current) {
-      // Try multiple methods to get the user identifier
-      const driverName = user.mailNickname || 
+      // Use displayName first, then fallback to mailNickname for system compatibility
+      const driverName = user.displayName || 
+                        user.mailNickname || 
                         user.email?.split('@')[0] || 
                         user.userPrincipalName?.split('@')[0] ||
-                        user.displayName?.replace(/\s+/g, '.').toLowerCase() ||
                         'unknown-user';
       
       logger.debug('Auto-setting driver name from user data - driver set successfully');
