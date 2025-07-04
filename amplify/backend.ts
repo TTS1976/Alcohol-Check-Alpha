@@ -4,6 +4,7 @@ import { data } from './data/resource';
 import { sendTeamsNotification } from './functions/send-teams-notification/resource';
 import { directCloudUpload } from './functions/directcloud-upload/resource';
 import { directcloudDownload } from './functions/directcloud-download/resource';
+import { logApprovalIssue } from './functions/log-approval-issue/resource';
 import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 
 const backend = defineBackend({
@@ -12,6 +13,7 @@ const backend = defineBackend({
   sendTeamsNotification,
   directCloudUpload,
   directcloudDownload,
+  logApprovalIssue, // Register the new logging Lambda
 });
 
 // Temporarily allow public access to Lambda functions

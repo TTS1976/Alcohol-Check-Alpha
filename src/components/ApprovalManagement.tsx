@@ -5,12 +5,27 @@ import { ImageDisplay } from './ImageDisplay';
 import { useAuth } from '../contexts/AuthContext';
 import { getSubmissionsPaginated, getDriversPaginated, getSubmissionsByConfirmerPaginated } from '../utils/paginationHelper';
 import { logger } from '../utils/logger';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
 import { isKachoLevel } from '../config/authConfig';
 
 const client = generateClient<Schema>({
   authMode: 'apiKey'
 });
+
+const lambdaClient = new LambdaClient({ region: 'ap-northeast-1' }); // Set your AWS region
+
+const logToCloudWatch = async (logData: any) => {
+  try {
+    await lambdaClient.send(new InvokeCommand({
+      FunctionName: 'log-approval-issue', // The Lambda function name
+      Payload: Buffer.from(JSON.stringify(logData)),
+    }));
+  } catch (err) {
+    // Optionally log to console if CloudWatch logging fails
+    console.error('Failed to log to CloudWatch:', err);
+  }
+};
 
 interface ApprovalManagementProps {
   onBack?: () => void;
@@ -116,6 +131,20 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     } catch (error) {
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      // Log to CloudWatch
+      logToCloudWatch({
+        error: error instanceof Error ? error.message : error,
+        user: {
+          mailNickname: user?.mailNickname,
+          email: user?.email,
+          id: user?.id,
+          objectId: user?.objectId,
+          azureId: user?.azureId,
+          displayName: user?.displayName,
+        },
+        timestamp: new Date().toISOString(),
+        context: 'loadPendingSubmissions',
+      });
     } finally {
       setIsLoading(false);
     }

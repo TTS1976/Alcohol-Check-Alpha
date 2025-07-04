@@ -932,43 +932,39 @@ function App({ user = null }: AppProps) {
       let drivingStatus = "運転中";
       let relatedSubmissionId = null;
       
+      // Determine submittedBy value consistently (moved up to use in filtering)
+      const submittedByValue = user?.mailNickname || user?.email || user?.userPrincipalName || formData.driverName || 'test-user';
+      
       if (registrationType === 'end') {
         drivingStatus = "運転終了";
-        // Find the latest start registration for this driver using paginated query
+        // Find the latest start registration for this driver using submittedBy for accurate matching
         const startSubmissions = await getAllSubmissions({
           registrationType: '運転開始登録',
-          maxItems: 2000 // Reasonable limit for start submissions
+          submittedBy: submittedByValue, // Use submittedBy instead of filtering by driverName
+          maxItems: 50 // Reduced since we're filtering by user
         });
         
-        // Filter by driver name after fetching
-        const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === formData.driverName);
-        
-        if (driverStartSubmissions && driverStartSubmissions.length > 0) {
-          const latestStart = driverStartSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+        if (startSubmissions && startSubmissions.length > 0) {
+          const latestStart = startSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
         }
       } else if (registrationType === 'middle') {
-        // For middle registration, find the latest start registration for this driver using paginated query
+        // For middle registration, find the latest start registration for this driver using submittedBy for accurate matching
         const startSubmissions = await getAllSubmissions({
           registrationType: '運転開始登録',
-          maxItems: 2000 // Reasonable limit for start submissions
+          submittedBy: submittedByValue, // Use submittedBy instead of filtering by driverName
+          maxItems: 50 // Reduced since we're filtering by user
         });
         
-        // Filter by driver name after fetching
-        const driverStartSubmissions = startSubmissions.filter(sub => sub.driverName === formData.driverName);
-        
-        if (driverStartSubmissions && driverStartSubmissions.length > 0) {
+        if (startSubmissions && startSubmissions.length > 0) {
           // Sort by submittedAt descending and pick the latest
-          const latestStart = driverStartSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
+          const latestStart = startSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
         }
       }
 
       // Get confirmer information
       const selectedConfirmer = availableConfirmers.find(c => c.id === formData.selectedConfirmer);
-      
-      // Determine submittedBy value consistently
-      const submittedByValue = user?.mailNickname || user?.email || user?.userPrincipalName || formData.driverName || 'test-user';
       
 
       
