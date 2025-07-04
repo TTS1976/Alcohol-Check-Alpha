@@ -1712,7 +1712,7 @@ function App({ user = null }: AppProps) {
                     ) : pendingApprovalCount > 0 ? (
                       <>
                         <div className="text-lg font-medium">
-                          現在の状態: 承認待ち申請があります
+                          承認待ち申請があります !
                         </div>
                         <div className="text-sm opacity-90">
                           {pendingApprovalCount}件の承認待ち申請があります。
@@ -1721,7 +1721,7 @@ function App({ user = null }: AppProps) {
                           onClick={() => setCurrentView('approvals')}
                           className="mt-2 bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-lg transition-all duration-300"
                         >
-                          承認管理で確認する
+                          確認する
                         </button>
                       </>
                     ) : (
