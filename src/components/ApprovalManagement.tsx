@@ -98,6 +98,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   const loadPendingSubmissions = async (showRefreshStatus = true) => {
     setIsLoading(true);
     try {
+      // Add user validation to prevent errors
+      if (!user) {
+        throw new Error('User information not available');
+      }
+
       if (showRefreshStatus) {
         setStatus('承認待ち申請を読み込み中...');
       }
@@ -493,7 +498,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
             <h1 className="text-xl font-bold">承認管理</h1>
             <p className="text-sm opacity-90">
               承認待ち: {filteredSubmissions.length}件 | 
-              あなたの役職: {user?.position || '一般'} (レベル{user?.jobLevel || 1}) | 
+              あなたの役職: {user?.position || user?.jobTitle || '一般'} (レベル{user?.jobLevel || 1}) | 
               権限: {user?.role === 'SafeDrivingManager' ? '安全運転管理者' : 
                     user?.role === 'Manager' ? '管理者' : 
                     isKachoLevel(user?.jobLevel || 1) ? '課長レベル' : '一般'}
