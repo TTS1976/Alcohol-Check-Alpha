@@ -445,7 +445,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       // Load drivers using new paginated approach
       const driversResult = await getDriversPaginated({ 
         excludeDeleted: true,
-        limit: 100 // Load more drivers at once for mapping
+        limit: 300 // Load more drivers at once for mapping
       });
       
       console.log('📋 Loaded drivers from schema:', driversResult.items.length);
