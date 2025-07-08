@@ -17,9 +17,13 @@ const lambdaClient = new LambdaClient({ region: 'ap-northeast-1' }); // Set your
 
 const logToCloudWatch = async (logData: any) => {
   try {
+    // Fix: Use TextEncoder instead of Buffer for browser compatibility
+    const encoder = new TextEncoder();
+    const payload = encoder.encode(JSON.stringify(logData));
+    
     await lambdaClient.send(new InvokeCommand({
       FunctionName: 'log-approval-issue', // The Lambda function name
-      Payload: Buffer.from(JSON.stringify(logData)),
+      Payload: payload,
     }));
   } catch (err) {
     // Optionally log to console if CloudWatch logging fails
@@ -126,6 +130,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           sortDirection: 'DESC'
         });
       }
+      
+      // Fix: Add null checks for result
+      if (!result || !result.items) {
+        throw new Error('Invalid response from server');
+      }
+      
       const pendingSubmissions = result.items;
       logger.info(`Loaded ${pendingSubmissions.length} pending submissions`);
       setPendingSubmissions(pendingSubmissions);
@@ -136,6 +146,13 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     } catch (error) {
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      
+      // Fix: Initialize empty state on error to prevent further errors
+      setPendingSubmissions([]);
+      setNextToken(undefined);
+      setHasMore(false);
+      setTotalLoaded(0);
+      
       // Log to CloudWatch
       logToCloudWatch({
         error: error instanceof Error ? error.message : error,
@@ -181,6 +198,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           sortDirection: 'DESC'
         });
       }
+      
+      // Fix: Add null checks for result
+      if (!result || !result.items) {
+        throw new Error('Invalid response from server');
+      }
+      
       const newPendingSubmissions = result.items;
       logger.debug(`Loaded ${newPendingSubmissions.length} additional pending submissions`);
       const allPendingSubmissions = [...pendingSubmissions, ...newPendingSubmissions];
@@ -213,8 +236,13 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       logger.debug('Resolving vehicle names for', vehicleIds.length, 'vehicles');
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
       
-      setVehicleNames(prev => ({ ...prev, ...resolved }));
-      logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
+      // Fix: Add null check before using Object.keys
+      if (resolved && typeof resolved === 'object') {
+        setVehicleNames(prev => ({ ...prev, ...resolved }));
+        logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
+      } else {
+        logger.warn('Invalid response from resolveVehicleIds:', resolved);
+      }
     } catch (error) {
       logger.error('Failed to resolve vehicle names:', error);
     }
@@ -234,6 +262,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         excludeDeleted: true,
         limit: 100 // Load more drivers at once for mapping
       });
+      
+      // Fix: Add null check for driversResult
+      if (!driversResult || !driversResult.items) {
+        logger.warn('Invalid response from getDriversPaginated');
+        return;
+      }
       
       logger.debug('Loaded drivers from schema:', driversResult.items.length);
       
@@ -261,7 +295,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   };
 
   const filterSubmissions = () => {
-    let filtered = pendingSubmissions;
+    // Fix: Ensure pendingSubmissions is always an array
+    let filtered = Array.isArray(pendingSubmissions) ? pendingSubmissions : [];
 
     // Apply search filter
     if (searchTerm.trim()) {
@@ -332,12 +367,14 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       }
     }
 
-    logger.debug('Filtered submissions count:', filtered.length, 'by type:', 
-      filtered.reduce((acc: Record<string, number>, sub) => {
-        acc[sub.registrationType] = (acc[sub.registrationType] || 0) + 1;
-        return acc;
-      }, {})
-    );
+    // Fix: Add safety check for filtered array before reduce
+    const typeBreakdown = filtered.length > 0 ? filtered.reduce((acc: Record<string, number>, sub) => {
+      const type = sub.registrationType || 'unknown';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {}) : {};
+
+    logger.debug('Filtered submissions count:', filtered.length, 'by type:', typeBreakdown);
     
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
