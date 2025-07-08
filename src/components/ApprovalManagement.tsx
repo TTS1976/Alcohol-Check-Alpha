@@ -105,8 +105,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       
       // Now let's try the specific confirmer query
       console.log('🔍 DEBUG: Testing confirmer-specific query...');
+      const userIdentifier = user?.azureId || user?.id || user?.objectId || user?.mailNickname || user?.email;
+      console.log('🔍 DEBUG: Using userIdentifier for query:', userIdentifier);
+      
       const confirmerResult = await getSubmissionsByConfirmerPaginated({
-        confirmerId: user?.mailNickname || '',
+        confirmerId: userIdentifier || '',
         approvalStatus: 'PENDING',
         limit: 100,
         sortDirection: 'DESC'
@@ -233,8 +236,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       } else {
         console.log('🔍 DEBUG: User is not SafeDrivingManager, fetching confirmer submissions');
         // Non-admin: fetch only submissions where user is confirmer
-        const userIdentifier = user?.mailNickname || user?.email || user?.id || user?.objectId || user?.azureId;
+        // Fix: Use azureId first since that's what's stored as confirmerId in the database
+        const userIdentifier = user?.azureId || user?.id || user?.objectId || user?.mailNickname || user?.email;
         console.log('🔍 DEBUG: userIdentifier:', userIdentifier);
+        console.log('🔍 DEBUG: user.azureId:', user?.azureId);
+        console.log('🔍 DEBUG: user.mailNickname:', user?.mailNickname);
         
         if (!userIdentifier) {
           console.log('❌ DEBUG: No user identifier found');
