@@ -121,7 +121,7 @@ export async function getSubmissionsPaginated(options: {
   }
   
   return getItemsPaginated<Schema["AlcoholCheckSubmission"]["type"]>('AlcoholCheckSubmission', {
-    filter: Object.keys(filter).length > 0 ? filter : undefined,
+    filter: filter && Object.keys(filter).length > 0 ? filter : undefined,
     limit,
     nextToken,
     sortDirection
@@ -264,7 +264,7 @@ export async function getAllSubmissions(options: {
   }
   
   return getAllItems<Schema["AlcoholCheckSubmission"]["type"]>('AlcoholCheckSubmission', {
-    filter: Object.keys(filter).length > 0 ? filter : undefined,
+    filter: filter && Object.keys(filter).length > 0 ? filter : undefined,
     maxItems
   });
 }
