@@ -514,9 +514,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     // Fix: Ensure pendingSubmissions is always an array
     let filtered = Array.isArray(pendingSubmissions) ? pendingSubmissions : [];
+    console.log('🔍 DEBUG: Initial filtered array length:', filtered.length);
 
     // Apply search filter
     if (searchTerm.trim()) {
+      console.log('🔍 DEBUG: Applying search filter for term:', searchTerm);
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(submission => 
         submission.driverName?.toLowerCase().includes(term) ||
@@ -524,14 +526,19 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         submission.destination?.toLowerCase().includes(term) ||
         submission.submittedBy?.toLowerCase().includes(term)
       );
+      console.log('🔍 DEBUG: After search filter, length:', filtered.length);
     }
 
     // Apply role-based filtering - show only submissions where current user is the selected confirmer
     if (user) {
+      console.log('🔍 DEBUG: User exists, applying role-based filtering...');
       console.log('🔍 DEBUG: Filtering submissions for user:', user.mailNickname || user.email);
-      console.log('🔍 DEBUG: Total submissions before filtering:', filtered.length);
+      console.log('🔍 DEBUG: Total submissions before role filtering:', filtered.length);
       
-      if (checkUserRole('SafeDrivingManager')) {
+      const isSafeDrivingManager = checkUserRole('SafeDrivingManager');
+      console.log('🔍 DEBUG: checkUserRole(SafeDrivingManager) result:', isSafeDrivingManager);
+      
+      if (isSafeDrivingManager) {
         // SafeDrivingManager can see all submissions
         console.log('🔍 DEBUG: User is SafeDrivingManager - showing all submissions');
       } else {
@@ -591,6 +598,8 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           );
         }
       }
+    } else {
+      console.log('🔍 DEBUG: No user object - not applying role-based filtering');
     }
 
     // Fix: Add safety check for filtered array before reduce
@@ -600,10 +609,15 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       return acc;
     }, {}) : {};
 
-    console.log('🔍 DEBUG: Filtered submissions count:', filtered.length, 'by type:', typeBreakdown);
+    console.log('🔍 DEBUG: Final filtering results:');
+    console.log('🔍 DEBUG: - Filtered submissions count:', filtered.length);
+    console.log('🔍 DEBUG: - Type breakdown:', typeBreakdown);
+    console.log('🔍 DEBUG: - Setting filteredSubmissions state...');
     
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
+    
+    console.log('🔍 DEBUG: filterSubmissions completed');
   };
 
 
