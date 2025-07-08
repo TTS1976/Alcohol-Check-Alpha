@@ -537,33 +537,42 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       } else {
         // For regular users, only show submissions where they are the selected confirmer
         const originalFiltered = filtered;
-        filtered = filtered.filter(submission => {
-          // Check if current user is the selected confirmer using multiple possible identifiers
-          const isSelectedConfirmer = 
-            submission.confirmerId === user.mailNickname || 
-            submission.confirmerId === user.id ||
-            submission.confirmerId === user.objectId ||
-            submission.confirmerId === user.email ||
-            submission.confirmerId === user.azureId ||
-            submission.confirmerEmail === user.email ||
-            submission.confirmedBy === user.displayName ||
-            submission.confirmedBy === user.mailNickname;
+        console.log('🔍 DEBUG: Starting filtering for regular user...');
+        console.log('🔍 DEBUG: User identifiers:', {
+          mailNickname: user.mailNickname,
+          id: user.id,
+          objectId: user.objectId,
+          azureId: user.azureId,
+          email: user.email,
+          displayName: user.displayName
+        });
+        
+        filtered = filtered.filter((submission, index) => {
+          console.log(`🔍 DEBUG: Checking submission ${index + 1}/${originalFiltered.length}:`, {
+            id: submission.id,
+            registrationType: submission.registrationType,
+            confirmerId: submission.confirmerId,
+            confirmerEmail: submission.confirmerEmail,
+            confirmedBy: submission.confirmedBy
+          });
           
-          if (!isSelectedConfirmer) {
-            console.log(`🔍 DEBUG: Submission ${submission.id} (${submission.registrationType}) not matched:`, {
-              confirmerId: submission.confirmerId,
-              confirmerEmail: submission.confirmerEmail,
-              confirmedBy: submission.confirmedBy,
-              userIdentifiers: {
-                mailNickname: user.mailNickname,
-                id: user.id,
-                objectId: user.objectId,
-                azureId: user.azureId,
-                email: user.email,
-                displayName: user.displayName
-              }
-            });
-          }
+          // Check if current user is the selected confirmer using multiple possible identifiers
+          const checks = {
+            'confirmerId === mailNickname': submission.confirmerId === user.mailNickname,
+            'confirmerId === id': submission.confirmerId === user.id,
+            'confirmerId === objectId': submission.confirmerId === user.objectId,
+            'confirmerId === email': submission.confirmerId === user.email,
+            'confirmerId === azureId': submission.confirmerId === user.azureId,
+            'confirmerEmail === email': submission.confirmerEmail === user.email,
+            'confirmedBy === displayName': submission.confirmedBy === user.displayName,
+            'confirmedBy === mailNickname': submission.confirmedBy === user.mailNickname
+          };
+          
+          console.log(`🔍 DEBUG: Submission ${submission.id} checks:`, checks);
+          
+          const isSelectedConfirmer = Object.values(checks).some(check => check === true);
+          
+          console.log(`🔍 DEBUG: Submission ${submission.id} result: ${isSelectedConfirmer ? 'MATCHED' : 'NOT MATCHED'}`);
           
           return isSelectedConfirmer;
         });
