@@ -37,13 +37,7 @@ interface ApprovalManagementProps {
 }
 
 const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user }) => {
-  console.log('🔍 DEBUG: ApprovalManagement component mounted/rendered');
-  console.log('🔍 DEBUG: Initial props - onBack:', onBack);
-  console.log('🔍 DEBUG: Initial props - user:', user);
-  
   const { checkUserRole, graphService } = useAuth();
-  console.log('🔍 DEBUG: useAuth results - checkUserRole:', checkUserRole);
-  console.log('🔍 DEBUG: useAuth results - graphService:', graphService);
   
   // Server-side pagination state
   const [nextToken, setNextToken] = useState<string | undefined>();
@@ -63,125 +57,33 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
   const itemsPerPage = 20; // Increased for better performance
 
-  console.log('🔍 DEBUG: Initial state set up complete');
-  console.log('🔍 DEBUG: pendingSubmissions:', pendingSubmissions);
-  console.log('🔍 DEBUG: filteredSubmissions:', filteredSubmissions);
-  console.log('🔍 DEBUG: vehicleNames:', vehicleNames);
-  console.log('🔍 DEBUG: driverNames:', driverNames);
 
-  // Add test function to debug confirmerId matching
-  const testConfirmerQuery = async () => {
-    console.log('🔍 DEBUG: testConfirmerQuery started');
-    console.log('🔍 DEBUG: Current user mailNickname:', user?.mailNickname);
-    console.log('🔍 DEBUG: Current user email:', user?.email);
-    console.log('🔍 DEBUG: Current user displayName:', user?.displayName);
-    
-    try {
-      // First, let's get ALL pending submissions to see what's in the database
-      console.log('🔍 DEBUG: Getting ALL pending submissions...');
-      const allPendingResult = await getSubmissionsPaginated({
-        approvalStatus: 'PENDING',
-        limit: 100,
-        sortDirection: 'DESC'
-      });
-      
-      console.log('🔍 DEBUG: All pending submissions:', allPendingResult);
-      console.log('🔍 DEBUG: All pending submissions count:', allPendingResult.items.length);
-      
-      if (allPendingResult.items.length > 0) {
-        console.log('🔍 DEBUG: Sample submission data:');
-        allPendingResult.items.forEach((submission, index) => {
-          console.log(`🔍 DEBUG: Submission ${index + 1}:`, {
-            id: submission.id,
-            driverName: submission.driverName,
-            confirmerId: submission.confirmerId,
-            confirmerEmail: submission.confirmerEmail,
-            confirmedBy: submission.confirmedBy,
-            submittedBy: submission.submittedBy,
-            approvalStatus: submission.approvalStatus
-          });
-        });
-      }
-      
-      // Now let's try the specific confirmer query
-      console.log('🔍 DEBUG: Testing confirmer-specific query...');
-      const userIdentifier = user?.azureId || user?.id || user?.objectId || user?.mailNickname || user?.email;
-      console.log('🔍 DEBUG: Using userIdentifier for query:', userIdentifier);
-      
-      const confirmerResult = await getSubmissionsByConfirmerPaginated({
-        confirmerId: userIdentifier || '',
-        approvalStatus: 'PENDING',
-        limit: 100,
-        sortDirection: 'DESC'
-      });
-      
-      console.log('🔍 DEBUG: Confirmer-specific result:', confirmerResult);
-      console.log('🔍 DEBUG: Confirmer-specific submissions count:', confirmerResult.items.length);
-      
-    } catch (error) {
-      console.log('❌ DEBUG: Error in testConfirmerQuery:', error);
-    }
-  };
 
-  // Call test function when component mounts
   useEffect(() => {
-    console.log('🔍 DEBUG: useEffect[1] - loadPendingSubmissions on mount - EXECUTING');
-    console.log('🔍 DEBUG: About to call loadPendingSubmissions(false)');
-    try {
-      loadPendingSubmissions(false); // Don't show refresh status on initial load
-      console.log('🔍 DEBUG: loadPendingSubmissions call completed');
-      
-      // Also call our test function
-      setTimeout(() => {
-        console.log('🔍 DEBUG: Calling testConfirmerQuery after 2 seconds...');
-        testConfirmerQuery();
-      }, 2000);
-      
-    } catch (error) {
-      console.log('❌ DEBUG: Error calling loadPendingSubmissions:', error);
-    }
+    loadPendingSubmissions(false); // Don't show refresh status on initial load
   }, []);
 
   useEffect(() => {
-    console.log('🔍 DEBUG: useEffect[2] - filterSubmissions triggered');
-    console.log('🔍 DEBUG: searchTerm:', searchTerm);
-    console.log('🔍 DEBUG: user:', user);
-    console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
     filterSubmissions();
   }, [searchTerm, user, pendingSubmissions]);
 
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
-    console.log('🔍 DEBUG: useEffect[3] - resolve names triggered');
-    console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
-    console.log('🔍 DEBUG: graphService:', graphService);
-    
     if (pendingSubmissions.length > 0) {
       if (graphService) {
-        console.log('🔍 DEBUG: Calling resolveVehicleNames...');
         resolveVehicleNames();
-      } else {
-        console.log('❌ DEBUG: graphService is null, skipping resolveVehicleNames');
       }
-      console.log('🔍 DEBUG: Calling resolveDriverNames...');
       resolveDriverNames();
-    } else {
-      console.log('🔍 DEBUG: No pending submissions, skipping name resolution');
     }
   }, [pendingSubmissions.length, graphService]);
 
   // NEW: Auto-refresh when page becomes visible to handle database consistency
   useEffect(() => {
-    console.log('🔍 DEBUG: useEffect[4] - visibility change listener setup');
-    
     const handleVisibilityChange = () => {
-      console.log('🔍 DEBUG: Visibility changed, state:', document.visibilityState);
       if (document.visibilityState === 'visible') {
         logger.debug('Page became visible, refreshing approval data for consistency...');
-        console.log('🔍 DEBUG: Page became visible, refreshing data...');
         // Delay slightly to ensure any recent submissions are available
         setTimeout(() => {
-          console.log('🔍 DEBUG: Calling loadPendingSubmissions after visibility change');
           loadPendingSubmissions(false);
         }, 1000);
       }
@@ -189,71 +91,40 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
-      console.log('🔍 DEBUG: Removing visibility change listener');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
     // NEW: Load initial pending submissions with pagination
   const loadPendingSubmissions = async (showRefreshStatus = true) => {
-    console.log('🔍 DEBUG: loadPendingSubmissions started');
-    console.log('🔍 DEBUG: user object:', user);
-    console.log('🔍 DEBUG: showRefreshStatus:', showRefreshStatus);
-    
     setIsLoading(true);
     try {
       // Add user validation to prevent errors
       if (!user) {
-        console.log('❌ DEBUG: User is null/undefined');
         throw new Error('User information not available');
       }
-
-      console.log('🔍 DEBUG: User validation passed, user:', {
-        mailNickname: user.mailNickname,
-        email: user.email,
-        id: user.id,
-        objectId: user.objectId,
-        azureId: user.azureId
-      });
 
       if (showRefreshStatus) {
         setStatus('承認待ち申請を読み込み中...');
       }
       logger.info('Loading pending submissions with server-side pagination...');
       
-      console.log('🔍 DEBUG: Checking user role...');
-      console.log('🔍 DEBUG: checkUserRole function:', checkUserRole);
-      
       let result;
       if (checkUserRole('SafeDrivingManager')) {
-        console.log('🔍 DEBUG: User is SafeDrivingManager, fetching all pending submissions');
         // Admin: fetch all pending submissions
         result = await getSubmissionsPaginated({
           approvalStatus: 'PENDING',
           limit: 200,
           sortDirection: 'DESC'
         });
-        console.log('🔍 DEBUG: getSubmissionsPaginated result:', result);
       } else {
-        console.log('🔍 DEBUG: User is not SafeDrivingManager, fetching confirmer submissions');
         // Non-admin: fetch only submissions where user is confirmer
         // Fix: Use azureId first since that's what's stored as confirmerId in the database
         const userIdentifier = user?.azureId || user?.id || user?.objectId || user?.mailNickname || user?.email;
-        console.log('🔍 DEBUG: userIdentifier:', userIdentifier);
-        console.log('🔍 DEBUG: user.azureId:', user?.azureId);
-        console.log('🔍 DEBUG: user.mailNickname:', user?.mailNickname);
         
         if (!userIdentifier) {
-          console.log('❌ DEBUG: No user identifier found');
           throw new Error('Unable to determine user identifier for confirmer query');
         }
-        
-        console.log('🔍 DEBUG: Calling getSubmissionsByConfirmerPaginated with options:', {
-          confirmerId: userIdentifier,
-          approvalStatus: 'PENDING',
-          limit: 200,
-          sortDirection: 'DESC'
-        });
         
         result = await getSubmissionsByConfirmerPaginated({
           confirmerId: userIdentifier,
@@ -261,39 +132,21 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           limit: 200,
           sortDirection: 'DESC'
         });
-        console.log('🔍 DEBUG: getSubmissionsByConfirmerPaginated result:', result);
       }
-      
-      console.log('🔍 DEBUG: About to check result validity');
-      console.log('🔍 DEBUG: result type:', typeof result);
-      console.log('🔍 DEBUG: result:', result);
-      console.log('🔍 DEBUG: result.items type:', typeof result?.items);
-      console.log('🔍 DEBUG: result.items:', result?.items);
       
       // Fix: Add null checks for result
       if (!result || !result.items) {
-        console.log('❌ DEBUG: Invalid result or result.items');
         throw new Error('Invalid response from server');
       }
       
       const pendingSubmissions = result.items;
-      console.log('🔍 DEBUG: pendingSubmissions length:', pendingSubmissions.length);
-      console.log('🔍 DEBUG: pendingSubmissions:', pendingSubmissions);
-      
       logger.info(`Loaded ${pendingSubmissions.length} pending submissions`);
       setPendingSubmissions(pendingSubmissions);
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
       setTotalLoaded(pendingSubmissions.length);
       setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
-      
-      console.log('🔍 DEBUG: loadPendingSubmissions completed successfully');
     } catch (error) {
-      console.log('❌ DEBUG: Error in loadPendingSubmissions:', error);
-      console.log('❌ DEBUG: Error type:', typeof error);
-      console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
-      
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
       
@@ -319,7 +172,6 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       });
     } finally {
       setIsLoading(false);
-      console.log('🔍 DEBUG: loadPendingSubmissions finally block executed');
     }
   };
 
@@ -507,19 +359,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   };
 
   const filterSubmissions = () => {
-    console.log('🔍 DEBUG: filterSubmissions started');
-    console.log('🔍 DEBUG: pendingSubmissions:', pendingSubmissions);
-    console.log('🔍 DEBUG: searchTerm:', searchTerm);
-    console.log('🔍 DEBUG: user:', user);
-    console.log('🔍 DEBUG: checkUserRole:', checkUserRole);
-
     // Fix: Ensure pendingSubmissions is always an array
     let filtered = Array.isArray(pendingSubmissions) ? pendingSubmissions : [];
-    console.log('🔍 DEBUG: Initial filtered array length:', filtered.length);
 
     // Apply search filter
     if (searchTerm.trim()) {
-      console.log('🔍 DEBUG: Applying search filter for term:', searchTerm);
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(submission => 
         submission.driverName?.toLowerCase().includes(term) ||
@@ -527,98 +371,35 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         submission.destination?.toLowerCase().includes(term) ||
         submission.submittedBy?.toLowerCase().includes(term)
       );
-      console.log('🔍 DEBUG: After search filter, length:', filtered.length);
     }
 
     // Apply role-based filtering - show only submissions where current user is the selected confirmer
     if (user) {
-      console.log('🔍 DEBUG: User exists, applying role-based filtering...');
-      console.log('🔍 DEBUG: Filtering submissions for user:', user.mailNickname || user.email);
-      console.log('🔍 DEBUG: Total submissions before role filtering:', filtered.length);
-      
       const isSafeDrivingManager = checkUserRole('SafeDrivingManager');
-      console.log('🔍 DEBUG: checkUserRole(SafeDrivingManager) result:', isSafeDrivingManager);
       
       if (isSafeDrivingManager) {
         // SafeDrivingManager can see all submissions
-        console.log('🔍 DEBUG: User is SafeDrivingManager - showing all submissions');
       } else {
         // For regular users, only show submissions where they are the selected confirmer
-        const originalFiltered = filtered;
-        console.log('🔍 DEBUG: Starting filtering for regular user...');
-        console.log('🔍 DEBUG: User identifiers:', {
-          mailNickname: user.mailNickname,
-          id: user.id,
-          objectId: user.objectId,
-          azureId: user.azureId,
-          email: user.email,
-          displayName: user.displayName
-        });
-        
-        filtered = filtered.filter((submission, index) => {
-          console.log(`🔍 DEBUG: Checking submission ${index + 1}/${originalFiltered.length}:`, {
-            id: submission.id,
-            registrationType: submission.registrationType,
-            confirmerId: submission.confirmerId,
-            confirmerEmail: submission.confirmerEmail,
-            confirmedBy: submission.confirmedBy
-          });
-          
+        filtered = filtered.filter((submission) => {
           // Check if current user is the selected confirmer using multiple possible identifiers
-          const checks = {
-            'confirmerId === mailNickname': submission.confirmerId === user.mailNickname,
-            'confirmerId === id': submission.confirmerId === user.id,
-            'confirmerId === objectId': submission.confirmerId === user.objectId,
-            'confirmerId === email': submission.confirmerId === user.email,
-            'confirmerId === azureId': submission.confirmerId === user.azureId,
-            'confirmerEmail === email': submission.confirmerEmail === user.email,
-            'confirmedBy === displayName': submission.confirmedBy === user.displayName,
-            'confirmedBy === mailNickname': submission.confirmedBy === user.mailNickname
-          };
-          
-          console.log(`🔍 DEBUG: Submission ${submission.id} checks:`, checks);
-          
-          const isSelectedConfirmer = Object.values(checks).some(check => check === true);
-          
-          console.log(`🔍 DEBUG: Submission ${submission.id} result: ${isSelectedConfirmer ? 'MATCHED' : 'NOT MATCHED'}`);
+          const isSelectedConfirmer = 
+            submission.confirmerId === user.mailNickname ||
+            submission.confirmerId === user.id ||
+            submission.confirmerId === user.objectId ||
+            submission.confirmerId === user.email ||
+            submission.confirmerId === user.azureId ||
+            submission.confirmerEmail === user.email ||
+            submission.confirmedBy === user.displayName ||
+            submission.confirmedBy === user.mailNickname;
           
           return isSelectedConfirmer;
         });
-        
-        // Enhanced debugging for ID mismatch issues
-        if (filtered.length === 0 && originalFiltered.length > 0) {
-          console.log('🔍 DEBUG: No submissions matched user identifiers. Registration types in original list:', 
-            originalFiltered.map(s => s.registrationType));
-          console.log('🔍 DEBUG: Sample confirmer data from submissions:', 
-            originalFiltered.slice(0, 3).map(s => ({
-              registrationType: s.registrationType,
-              confirmerId: s.confirmerId,
-              confirmerEmail: s.confirmerEmail,
-              confirmedBy: s.confirmedBy
-            }))
-          );
-        }
       }
-    } else {
-      console.log('🔍 DEBUG: No user object - not applying role-based filtering');
     }
 
-    // Fix: Add safety check for filtered array before reduce
-    const typeBreakdown = filtered.length > 0 ? filtered.reduce((acc: Record<string, number>, sub) => {
-      const type = sub.registrationType || 'unknown';
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {}) : {};
-
-    console.log('🔍 DEBUG: Final filtering results:');
-    console.log('🔍 DEBUG: - Filtered submissions count:', filtered.length);
-    console.log('🔍 DEBUG: - Type breakdown:', typeBreakdown);
-    console.log('🔍 DEBUG: - Setting filteredSubmissions state...');
-    
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
-    
-    console.log('🔍 DEBUG: filterSubmissions completed');
   };
 
 

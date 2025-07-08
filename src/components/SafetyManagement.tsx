@@ -132,18 +132,14 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
         setHasMore(result.hasMore);
       } else {
         // Regular user: Load both submitted and confirmed submissions
-        console.log('🔍 DEBUG: Loading submissions for regular user...');
-        
         // 1. Load submissions submitted by user
         const userIdentifier = user?.azureId || user?.mailNickname || user?.email;
-        console.log('🔍 DEBUG: User identifier for submittedBy query:', userIdentifier);
         
         const submittedResult = await getSubmissionsPaginated({
           submittedBy: user?.mailNickname || user?.email,
           limit: 100,
           sortDirection: 'DESC'
         });
-        console.log('🔍 DEBUG: Submissions submitted by user:', submittedResult.items.length);
         
         // 2. Load submissions confirmed by user (using fixed azureId logic)
         let confirmedResult: any = { items: [], nextToken: null, hasMore: false };
@@ -156,9 +152,8 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
             sortDirection: 'DESC'
           });
         } catch (error) {
-          console.log('🔍 DEBUG: getSubmissionsByConfirmerPaginated not available, skipping confirmed submissions');
+          // Silently skip if function not available
         }
-        console.log('🔍 DEBUG: Submissions confirmed by user:', confirmedResult.items.length);
         
         // 3. Combine and deduplicate submissions
         const submissionMap = new Map();
@@ -176,7 +171,6 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
         });
         
         allSubmissionsToShow = Array.from(submissionMap.values());
-        console.log('🔍 DEBUG: Combined unique submissions:', allSubmissionsToShow.length);
         
         // Set pagination info (use submitted result for consistency)
         setNextToken(submittedResult.nextToken);
@@ -316,10 +310,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
 
   // Create grouped submissions
   const createSubmissionGroups = () => {
-    console.log('🔗 Creating submission groups from:', allSubmissions.length, 'submissions');
-    
     // Process submissions and their relationships
-    
     const groups = new Map<string, SubmissionGroup>();
     
     // First, find all start submissions and create groups
@@ -337,8 +328,6 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
         });
       }
     });
-
-    console.log('📦 Created', groups.size, 'initial groups');
 
     // Then, add middle and end submissions to their respective groups
     allSubmissions.forEach(submission => {
@@ -436,8 +425,6 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       });
     }
 
-    console.log('🎯 Final groups created:', groups.size);
-    
     setFilteredGroups(groupsArray);
     setCurrentPage(1);
   };
@@ -477,13 +464,13 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
 
       if (vehicleIds.length === 0) return;
 
-      console.log('Resolving vehicle names for', vehicleIds.length, 'vehicles');
+      logger.debug('Resolving vehicle names for', vehicleIds.length, 'vehicles');
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
       
       setVehicleNames(prev => ({ ...prev, ...resolved }));
-      console.log('Resolved', Object.keys(resolved).length, 'vehicle names');
+      logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
     } catch (error) {
-      console.error('Failed to resolve vehicle names:', error);
+      logger.error('Failed to resolve vehicle names:', error);
     }
   };
 
@@ -494,7 +481,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       // Get unique driver identifiers from submissions (these are mailNicknames)
       const uniqueDrivers = [...new Set(allSubmissions.map(s => s.driverName).filter(Boolean))];
       
-      console.log('🔍 Resolving driver names for', uniqueDrivers.length, 'drivers');
+      logger.debug('Resolving driver names for', uniqueDrivers.length, 'drivers');
       
       // Load drivers using new paginated approach
       const driversResult = await getDriversPaginated({ 
@@ -502,7 +489,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
         limit: 300 // Load more drivers at once for mapping
       });
       
-      console.log('📋 Loaded drivers from schema:', driversResult.items.length);
+      logger.debug('Loaded drivers from schema:', driversResult.items.length);
       
       for (const mailNickname of uniqueDrivers) {
         // Find the driver by matching the mailNickname with the email prefix
@@ -514,16 +501,16 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
         
         if (matchedDriver && matchedDriver.name) {
           driverMap[mailNickname] = matchedDriver.name;
-          console.log(`✅ Resolved driver name successfully`);
+          logger.debug('Resolved driver name successfully');
         } else {
-                      console.log(`❌ Could not resolve driver name`);
+          logger.debug('Could not resolve driver name');
         }
       }
       
-      console.log('🎯 Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
+      logger.debug('Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
       setDriverNames(driverMap);
     } catch (error) {
-      console.error('Error resolving driver names:', error);
+      logger.error('Error resolving driver names:', error);
     }
   };
 
