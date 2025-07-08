@@ -67,6 +67,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     filterSubmissions();
   }, [searchTerm, user, pendingSubmissions]);
 
+  // Separate useEffect to reset page only when search/filter criteria change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
     if (pendingSubmissions.length > 0) {
@@ -399,7 +404,6 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     }
 
     setFilteredSubmissions(filtered);
-    setCurrentPage(1);
   };
 
 
