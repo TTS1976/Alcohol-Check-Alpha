@@ -69,10 +69,74 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   console.log('🔍 DEBUG: vehicleNames:', vehicleNames);
   console.log('🔍 DEBUG: driverNames:', driverNames);
 
+  // Add test function to debug confirmerId matching
+  const testConfirmerQuery = async () => {
+    console.log('🔍 DEBUG: testConfirmerQuery started');
+    console.log('🔍 DEBUG: Current user mailNickname:', user?.mailNickname);
+    console.log('🔍 DEBUG: Current user email:', user?.email);
+    console.log('🔍 DEBUG: Current user displayName:', user?.displayName);
+    
+    try {
+      // First, let's get ALL pending submissions to see what's in the database
+      console.log('🔍 DEBUG: Getting ALL pending submissions...');
+      const allPendingResult = await getSubmissionsPaginated({
+        approvalStatus: 'PENDING',
+        limit: 100,
+        sortDirection: 'DESC'
+      });
+      
+      console.log('🔍 DEBUG: All pending submissions:', allPendingResult);
+      console.log('🔍 DEBUG: All pending submissions count:', allPendingResult.items.length);
+      
+      if (allPendingResult.items.length > 0) {
+        console.log('🔍 DEBUG: Sample submission data:');
+        allPendingResult.items.forEach((submission, index) => {
+          console.log(`🔍 DEBUG: Submission ${index + 1}:`, {
+            id: submission.id,
+            driverName: submission.driverName,
+            confirmerId: submission.confirmerId,
+            confirmerEmail: submission.confirmerEmail,
+            confirmedBy: submission.confirmedBy,
+            submittedBy: submission.submittedBy,
+            approvalStatus: submission.approvalStatus
+          });
+        });
+      }
+      
+      // Now let's try the specific confirmer query
+      console.log('🔍 DEBUG: Testing confirmer-specific query...');
+      const confirmerResult = await getSubmissionsByConfirmerPaginated({
+        confirmerId: user?.mailNickname || '',
+        approvalStatus: 'PENDING',
+        limit: 100,
+        sortDirection: 'DESC'
+      });
+      
+      console.log('🔍 DEBUG: Confirmer-specific result:', confirmerResult);
+      console.log('🔍 DEBUG: Confirmer-specific submissions count:', confirmerResult.items.length);
+      
+    } catch (error) {
+      console.log('❌ DEBUG: Error in testConfirmerQuery:', error);
+    }
+  };
 
+  // Call test function when component mounts
   useEffect(() => {
-    console.log('🔍 DEBUG: useEffect[1] - loadPendingSubmissions on mount');
-    loadPendingSubmissions(false); // Don't show refresh status on initial load
+    console.log('🔍 DEBUG: useEffect[1] - loadPendingSubmissions on mount - EXECUTING');
+    console.log('🔍 DEBUG: About to call loadPendingSubmissions(false)');
+    try {
+      loadPendingSubmissions(false); // Don't show refresh status on initial load
+      console.log('🔍 DEBUG: loadPendingSubmissions call completed');
+      
+      // Also call our test function
+      setTimeout(() => {
+        console.log('🔍 DEBUG: Calling testConfirmerQuery after 2 seconds...');
+        testConfirmerQuery();
+      }, 2000);
+      
+    } catch (error) {
+      console.log('❌ DEBUG: Error calling loadPendingSubmissions:', error);
+    }
   }, []);
 
   useEffect(() => {
@@ -340,7 +404,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       // Fix: Add null check before using Object.keys
       if (resolved && typeof resolved === 'object') {
         console.log('🔍 DEBUG: resolved is valid object, calling Object.keys...');
-        console.log('🔍 DEBUG: Object.keys(resolved):', Object.keys(resolved));
+        console.log('�� DEBUG: Object.keys(resolved):', Object.keys(resolved));
         
         setVehicleNames(prev => ({ ...prev, ...resolved }));
         logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
