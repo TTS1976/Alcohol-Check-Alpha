@@ -37,9 +37,13 @@ interface ApprovalManagementProps {
 }
 
 const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user }) => {
-  const { checkUserRole, graphService } = useAuth();
+  console.log('🔍 DEBUG: ApprovalManagement component mounted/rendered');
+  console.log('🔍 DEBUG: Initial props - onBack:', onBack);
+  console.log('🔍 DEBUG: Initial props - user:', user);
   
-
+  const { checkUserRole, graphService } = useAuth();
+  console.log('🔍 DEBUG: useAuth results - checkUserRole:', checkUserRole);
+  console.log('🔍 DEBUG: useAuth results - graphService:', graphService);
   
   // Server-side pagination state
   const [nextToken, setNextToken] = useState<string | undefined>();
@@ -55,38 +59,61 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
  
-
   const [vehicleNames, setVehicleNames] = useState<{[key: string]: string}>({});
   const [driverNames, setDriverNames] = useState<{[key: string]: string}>({}); // Map mailNickname to actual name
   const itemsPerPage = 20; // Increased for better performance
 
+  console.log('🔍 DEBUG: Initial state set up complete');
+  console.log('🔍 DEBUG: pendingSubmissions:', pendingSubmissions);
+  console.log('🔍 DEBUG: filteredSubmissions:', filteredSubmissions);
+  console.log('🔍 DEBUG: vehicleNames:', vehicleNames);
+  console.log('🔍 DEBUG: driverNames:', driverNames);
 
 
   useEffect(() => {
+    console.log('🔍 DEBUG: useEffect[1] - loadPendingSubmissions on mount');
     loadPendingSubmissions(false); // Don't show refresh status on initial load
   }, []);
 
   useEffect(() => {
+    console.log('🔍 DEBUG: useEffect[2] - filterSubmissions triggered');
+    console.log('🔍 DEBUG: searchTerm:', searchTerm);
+    console.log('🔍 DEBUG: user:', user);
     filterSubmissions();
   }, [searchTerm, user]);
 
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
+    console.log('🔍 DEBUG: useEffect[3] - resolve names triggered');
+    console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
+    console.log('🔍 DEBUG: graphService:', graphService);
+    
     if (pendingSubmissions.length > 0) {
       if (graphService) {
+        console.log('🔍 DEBUG: Calling resolveVehicleNames...');
         resolveVehicleNames();
+      } else {
+        console.log('❌ DEBUG: graphService is null, skipping resolveVehicleNames');
       }
+      console.log('🔍 DEBUG: Calling resolveDriverNames...');
       resolveDriverNames();
+    } else {
+      console.log('🔍 DEBUG: No pending submissions, skipping name resolution');
     }
   }, [pendingSubmissions.length, graphService]);
 
   // NEW: Auto-refresh when page becomes visible to handle database consistency
   useEffect(() => {
+    console.log('🔍 DEBUG: useEffect[4] - visibility change listener setup');
+    
     const handleVisibilityChange = () => {
+      console.log('🔍 DEBUG: Visibility changed, state:', document.visibilityState);
       if (document.visibilityState === 'visible') {
         logger.debug('Page became visible, refreshing approval data for consistency...');
+        console.log('🔍 DEBUG: Page became visible, refreshing data...');
         // Delay slightly to ensure any recent submissions are available
         setTimeout(() => {
+          console.log('🔍 DEBUG: Calling loadPendingSubmissions after visibility change');
           loadPendingSubmissions(false);
         }, 1000);
       }
@@ -94,56 +121,108 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      console.log('🔍 DEBUG: Removing visibility change listener');
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
     // NEW: Load initial pending submissions with pagination
   const loadPendingSubmissions = async (showRefreshStatus = true) => {
+    console.log('🔍 DEBUG: loadPendingSubmissions started');
+    console.log('🔍 DEBUG: user object:', user);
+    console.log('🔍 DEBUG: showRefreshStatus:', showRefreshStatus);
+    
     setIsLoading(true);
     try {
       // Add user validation to prevent errors
       if (!user) {
+        console.log('❌ DEBUG: User is null/undefined');
         throw new Error('User information not available');
       }
+
+      console.log('🔍 DEBUG: User validation passed, user:', {
+        mailNickname: user.mailNickname,
+        email: user.email,
+        id: user.id,
+        objectId: user.objectId,
+        azureId: user.azureId
+      });
 
       if (showRefreshStatus) {
         setStatus('承認待ち申請を読み込み中...');
       }
       logger.info('Loading pending submissions with server-side pagination...');
+      
+      console.log('🔍 DEBUG: Checking user role...');
+      console.log('🔍 DEBUG: checkUserRole function:', checkUserRole);
+      
       let result;
       if (checkUserRole('SafeDrivingManager')) {
+        console.log('🔍 DEBUG: User is SafeDrivingManager, fetching all pending submissions');
         // Admin: fetch all pending submissions
         result = await getSubmissionsPaginated({
           approvalStatus: 'PENDING',
           limit: 200,
           sortDirection: 'DESC'
         });
+        console.log('🔍 DEBUG: getSubmissionsPaginated result:', result);
       } else {
+        console.log('🔍 DEBUG: User is not SafeDrivingManager, fetching confirmer submissions');
         // Non-admin: fetch only submissions where user is confirmer
         const userIdentifier = user?.mailNickname || user?.email || user?.id || user?.objectId || user?.azureId;
-        if (!userIdentifier) throw new Error('Unable to determine user identifier for confirmer query');
+        console.log('🔍 DEBUG: userIdentifier:', userIdentifier);
+        
+        if (!userIdentifier) {
+          console.log('❌ DEBUG: No user identifier found');
+          throw new Error('Unable to determine user identifier for confirmer query');
+        }
+        
+        console.log('🔍 DEBUG: Calling getSubmissionsByConfirmerPaginated with options:', {
+          confirmerId: userIdentifier,
+          approvalStatus: 'PENDING',
+          limit: 200,
+          sortDirection: 'DESC'
+        });
+        
         result = await getSubmissionsByConfirmerPaginated({
           confirmerId: userIdentifier,
           approvalStatus: 'PENDING',
           limit: 200,
           sortDirection: 'DESC'
         });
+        console.log('🔍 DEBUG: getSubmissionsByConfirmerPaginated result:', result);
       }
+      
+      console.log('🔍 DEBUG: About to check result validity');
+      console.log('🔍 DEBUG: result type:', typeof result);
+      console.log('🔍 DEBUG: result:', result);
+      console.log('🔍 DEBUG: result.items type:', typeof result?.items);
+      console.log('🔍 DEBUG: result.items:', result?.items);
       
       // Fix: Add null checks for result
       if (!result || !result.items) {
+        console.log('❌ DEBUG: Invalid result or result.items');
         throw new Error('Invalid response from server');
       }
       
       const pendingSubmissions = result.items;
+      console.log('🔍 DEBUG: pendingSubmissions length:', pendingSubmissions.length);
+      console.log('🔍 DEBUG: pendingSubmissions:', pendingSubmissions);
+      
       logger.info(`Loaded ${pendingSubmissions.length} pending submissions`);
       setPendingSubmissions(pendingSubmissions);
       setNextToken(result.nextToken);
       setHasMore(result.hasMore);
       setTotalLoaded(pendingSubmissions.length);
       setStatus(`✅ ${pendingSubmissions.length}件の承認待ち申請を読み込みました${result.hasMore ? ' - 過去の申請をさらに読み込み可能' : ''}`);
+      
+      console.log('🔍 DEBUG: loadPendingSubmissions completed successfully');
     } catch (error) {
+      console.log('❌ DEBUG: Error in loadPendingSubmissions:', error);
+      console.log('❌ DEBUG: Error type:', typeof error);
+      console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
+      
       logger.error('Failed to load pending submissions:', error);
       setStatus('承認待ち申請の読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
       
@@ -169,6 +248,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       });
     } finally {
       setIsLoading(false);
+      console.log('🔍 DEBUG: loadPendingSubmissions finally block executed');
     }
   };
 
@@ -221,9 +301,19 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   };
 
   const resolveVehicleNames = async () => {
-    if (!graphService) return;
+    console.log('🔍 DEBUG: resolveVehicleNames started');
+    console.log('🔍 DEBUG: graphService:', graphService);
+    
+    if (!graphService) {
+      console.log('❌ DEBUG: graphService is null/undefined');
+      return;
+    }
     
     try {
+      console.log('🔍 DEBUG: pendingSubmissions for vehicle resolution:', pendingSubmissions);
+      console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
+      console.log('🔍 DEBUG: vehicleNames state:', vehicleNames);
+      
       // Get unique vehicle IDs from submissions
       const vehicleIds = [...new Set(
         pendingSubmissions
@@ -231,47 +321,83 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           .filter(id => id && !vehicleNames[id])
       )];
 
-      if (vehicleIds.length === 0) return;
+      console.log('🔍 DEBUG: vehicleIds to resolve:', vehicleIds);
+
+      if (vehicleIds.length === 0) {
+        console.log('🔍 DEBUG: No vehicle IDs to resolve');
+        return;
+      }
 
       logger.debug('Resolving vehicle names for', vehicleIds.length, 'vehicles');
+      console.log('🔍 DEBUG: Calling graphService.resolveVehicleIds...');
+      
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
+      console.log('🔍 DEBUG: graphService.resolveVehicleIds returned:', resolved);
+      console.log('🔍 DEBUG: resolved type:', typeof resolved);
+      console.log('🔍 DEBUG: resolved is null:', resolved === null);
+      console.log('🔍 DEBUG: resolved is undefined:', resolved === undefined);
       
       // Fix: Add null check before using Object.keys
       if (resolved && typeof resolved === 'object') {
+        console.log('🔍 DEBUG: resolved is valid object, calling Object.keys...');
+        console.log('🔍 DEBUG: Object.keys(resolved):', Object.keys(resolved));
+        
         setVehicleNames(prev => ({ ...prev, ...resolved }));
         logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
+        console.log('🔍 DEBUG: Vehicle names resolved successfully');
       } else {
+        console.log('❌ DEBUG: Invalid resolved object, skipping Object.keys');
         logger.warn('Invalid response from resolveVehicleIds:', resolved);
       }
     } catch (error) {
+      console.log('❌ DEBUG: Error in resolveVehicleNames:', error);
+      console.log('❌ DEBUG: Error type:', typeof error);
+      console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
+      
       logger.error('Failed to resolve vehicle names:', error);
     }
   };
 
   const resolveDriverNames = async () => {
+    console.log('🔍 DEBUG: resolveDriverNames started');
+    
     try {
       const driverMap: {[key: string]: string} = {};
+      
+      console.log('🔍 DEBUG: pendingSubmissions for driver resolution:', pendingSubmissions);
+      console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
       
       // Get unique driver identifiers from submissions (these are mailNicknames)
       const uniqueDrivers = [...new Set(pendingSubmissions.map(s => s.driverName).filter(Boolean))];
       
+      console.log('🔍 DEBUG: uniqueDrivers:', uniqueDrivers);
       logger.debug('Resolving driver names for', uniqueDrivers.length, 'drivers');
       
+      console.log('🔍 DEBUG: Calling getDriversPaginated...');
       // Load drivers using new paginated approach
       const driversResult = await getDriversPaginated({ 
         excludeDeleted: true,
         limit: 100 // Load more drivers at once for mapping
       });
       
+      console.log('🔍 DEBUG: getDriversPaginated returned:', driversResult);
+      console.log('🔍 DEBUG: driversResult type:', typeof driversResult);
+      console.log('🔍 DEBUG: driversResult.items type:', typeof driversResult?.items);
+      
       // Fix: Add null check for driversResult
       if (!driversResult || !driversResult.items) {
+        console.log('❌ DEBUG: Invalid driversResult, returning early');
         logger.warn('Invalid response from getDriversPaginated');
         return;
       }
       
+      console.log('🔍 DEBUG: driversResult.items.length:', driversResult.items.length);
       logger.debug('Loaded drivers from schema:', driversResult.items.length);
       
       for (const mailNickname of uniqueDrivers) {
+        console.log('🔍 DEBUG: Processing mailNickname:', mailNickname);
+        
         // Find the driver by matching the mailNickname with the email prefix
         const matchedDriver = driversResult.items.find(driver => {
           if (!driver.mail) return false;
@@ -279,22 +405,43 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           return emailPrefix === mailNickname.toLowerCase();
         });
         
+        console.log('🔍 DEBUG: matchedDriver for', mailNickname, ':', matchedDriver);
+        
         if (matchedDriver && matchedDriver.name) {
           driverMap[mailNickname] = matchedDriver.name;
+          console.log('🔍 DEBUG: Resolved driver name successfully for', mailNickname);
           logger.debug(`Resolved driver name successfully`);
         } else {
+          console.log('🔍 DEBUG: Could not resolve driver name for', mailNickname);
           logger.debug(`Could not resolve driver name`);
         }
       }
       
+      console.log('🔍 DEBUG: Final driverMap:', driverMap);
+      console.log('🔍 DEBUG: driverMap type:', typeof driverMap);
+      console.log('🔍 DEBUG: Calling Object.keys on driverMap...');
+      console.log('🔍 DEBUG: Object.keys(driverMap):', Object.keys(driverMap));
+      
       logger.debug('Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
       setDriverNames(driverMap);
+      console.log('🔍 DEBUG: resolveDriverNames completed successfully');
     } catch (error) {
+      console.log('❌ DEBUG: Error in resolveDriverNames:', error);
+      console.log('❌ DEBUG: Error type:', typeof error);
+      console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
+      
       logger.error('Error resolving driver names:', error);
     }
   };
 
   const filterSubmissions = () => {
+    console.log('🔍 DEBUG: filterSubmissions started');
+    console.log('🔍 DEBUG: pendingSubmissions:', pendingSubmissions);
+    console.log('🔍 DEBUG: searchTerm:', searchTerm);
+    console.log('🔍 DEBUG: user:', user);
+    console.log('🔍 DEBUG: checkUserRole:', checkUserRole);
+
     // Fix: Ensure pendingSubmissions is always an array
     let filtered = Array.isArray(pendingSubmissions) ? pendingSubmissions : [];
 
@@ -311,12 +458,12 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
 
     // Apply role-based filtering - show only submissions where current user is the selected confirmer
     if (user) {
-      logger.debug('Filtering submissions for user:', user.mailNickname || user.email);
-      logger.debug('Total submissions before filtering:', filtered.length);
+      console.log('🔍 DEBUG: Filtering submissions for user:', user.mailNickname || user.email);
+      console.log('🔍 DEBUG: Total submissions before filtering:', filtered.length);
       
       if (checkUserRole('SafeDrivingManager')) {
         // SafeDrivingManager can see all submissions
-        logger.debug('User is SafeDrivingManager - showing all submissions');
+        console.log('🔍 DEBUG: User is SafeDrivingManager - showing all submissions');
       } else {
         // For regular users, only show submissions where they are the selected confirmer
         const originalFiltered = filtered;
@@ -333,7 +480,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
             submission.confirmedBy === user.mailNickname;
           
           if (!isSelectedConfirmer) {
-            logger.debug(`Submission ${submission.id} (${submission.registrationType}) not matched:`, {
+            console.log(`🔍 DEBUG: Submission ${submission.id} (${submission.registrationType}) not matched:`, {
               confirmerId: submission.confirmerId,
               confirmerEmail: submission.confirmerEmail,
               confirmedBy: submission.confirmedBy,
@@ -353,9 +500,9 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         
         // Enhanced debugging for ID mismatch issues
         if (filtered.length === 0 && originalFiltered.length > 0) {
-          logger.warn('No submissions matched user identifiers. Registration types in original list:', 
+          console.log('🔍 DEBUG: No submissions matched user identifiers. Registration types in original list:', 
             originalFiltered.map(s => s.registrationType));
-          logger.warn('Sample confirmer data from submissions:', 
+          console.log('🔍 DEBUG: Sample confirmer data from submissions:', 
             originalFiltered.slice(0, 3).map(s => ({
               registrationType: s.registrationType,
               confirmerId: s.confirmerId,
@@ -374,7 +521,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
       return acc;
     }, {}) : {};
 
-    logger.debug('Filtered submissions count:', filtered.length, 'by type:', typeBreakdown);
+    console.log('🔍 DEBUG: Filtered submissions count:', filtered.length, 'by type:', typeBreakdown);
     
     setFilteredSubmissions(filtered);
     setCurrentPage(1);
