@@ -603,7 +603,8 @@ function App({ user = null }: AppProps) {
       setIsApprovalLoading(true);
       logger.debug('Checking for pending approval requests...');
       
-      const userIdentifier = user?.mailNickname || user?.email || user?.id || user?.objectId || user?.azureId;
+      // Fix: Use azureId first since that's what's stored as confirmerId in the database
+      const userIdentifier = user?.azureId || user?.id || user?.objectId || user?.mailNickname || user?.email;
       if (!userIdentifier) {
         logger.warn('Unable to determine user identifier for approval check');
         setPendingApprovalCount(0);
