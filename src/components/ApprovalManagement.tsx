@@ -146,8 +146,9 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
     console.log('🔍 DEBUG: useEffect[2] - filterSubmissions triggered');
     console.log('🔍 DEBUG: searchTerm:', searchTerm);
     console.log('🔍 DEBUG: user:', user);
+    console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
     filterSubmissions();
-  }, [searchTerm, user]);
+  }, [searchTerm, user, pendingSubmissions]);
 
   // Resolve vehicle names and driver names when submissions change
   useEffect(() => {
