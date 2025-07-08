@@ -327,36 +327,54 @@ export async function getSubmissionsByConfirmerPaginated(options: {
   nextToken?: string;
   sortDirection?: 'ASC' | 'DESC';
 }): Promise<PaginatedResult<Schema["AlcoholCheckSubmission"]["type"]>> {
+  console.log('🔍 DEBUG: getSubmissionsByConfirmerPaginated started');
+  console.log('🔍 DEBUG: options:', options);
+  
   const { confirmerId, approvalStatus = 'PENDING', limit = 50, nextToken, sortDirection = 'DESC' } = options;
 
-  // The generated query will be listAlcoholCheckSubmissionByConfirmerIdAndApprovalStatus
-  const queryOptions: any = {
+  console.log('🔍 DEBUG: destructured values:', {
     confirmerId,
     approvalStatus,
     limit,
-    sortDirection,
+    nextToken,
+    sortDirection
+  });
+
+  // Use regular filtered query instead of GSI to avoid Object.keys() error
+  const filter = {
+    confirmerId: { eq: confirmerId },
+    approvalStatus: { eq: approvalStatus }
   };
-  if (nextToken) queryOptions.nextToken = nextToken;
 
-  logger.debug(`Querying AlcoholCheckSubmission by confirmerId=${confirmerId}, approvalStatus=${approvalStatus}`);
+  console.log('🔍 DEBUG: filter object:', filter);
+  console.log('🔍 DEBUG: filter type:', typeof filter);
 
-  // Use the generated GSI query
-  const result = await client.models.AlcoholCheckSubmission.listAlcoholCheckSubmissionByConfirmerIdAndApprovalStatus(queryOptions);
+  try {
+    console.log('🔍 DEBUG: Calling getItemsPaginated with filter...');
+    
+    // Use the regular paginated query with filter instead of GSI
+    const result = await getItemsPaginated<Schema["AlcoholCheckSubmission"]["type"]>('AlcoholCheckSubmission', {
+      filter,
+      limit,
+      nextToken,
+      sortDirection
+    });
 
-  if (!result.data) {
-    logger.warn(`No data returned for confirmerId: ${confirmerId}`);
-    return {
-      items: [],
-      hasMore: false
-    };
+    console.log('🔍 DEBUG: getItemsPaginated completed successfully');
+    console.log('🔍 DEBUG: result:', result);
+
+    logger.debug(`Loaded ${result.items.length} submissions for confirmerId: ${confirmerId}`);
+
+    console.log('🔍 DEBUG: returning result from getSubmissionsByConfirmerPaginated');
+    return result;
+
+  } catch (error) {
+    console.log('❌ DEBUG: Error in getSubmissionsByConfirmerPaginated:', error);
+    console.log('❌ DEBUG: Error type:', typeof error);
+    console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
+    // Re-throw the error so it can be caught by the calling function
+    throw error;
   }
-
-  const items = result.data as Schema["AlcoholCheckSubmission"]["type"][];
-  logger.debug(`Loaded ${items.length} submissions for confirmerId: ${confirmerId}`);
-
-  return {
-    items,
-    nextToken: result.nextToken ?? undefined,
-    hasMore: !!result.nextToken
-  };
 } 
