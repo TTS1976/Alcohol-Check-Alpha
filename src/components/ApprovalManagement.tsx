@@ -229,19 +229,11 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
   };
 
   const resolveVehicleNames = async () => {
-    console.log('🔍 DEBUG: resolveVehicleNames started');
-    console.log('🔍 DEBUG: graphService:', graphService);
-    
     if (!graphService) {
-      console.log('❌ DEBUG: graphService is null/undefined');
       return;
     }
     
     try {
-      console.log('🔍 DEBUG: pendingSubmissions for vehicle resolution:', pendingSubmissions);
-      console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
-      console.log('🔍 DEBUG: vehicleNames state:', vehicleNames);
-      
       // Get unique vehicle IDs from submissions
       const vehicleIds = [...new Set(
         pendingSubmissions
@@ -249,83 +241,50 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           .filter(id => id && !vehicleNames[id])
       )];
 
-      console.log('🔍 DEBUG: vehicleIds to resolve:', vehicleIds);
-
       if (vehicleIds.length === 0) {
-        console.log('🔍 DEBUG: No vehicle IDs to resolve');
         return;
       }
 
       logger.debug('Resolving vehicle names for', vehicleIds.length, 'vehicles');
-      console.log('🔍 DEBUG: Calling graphService.resolveVehicleIds...');
       
       const resolved = await graphService.resolveVehicleIds(vehicleIds);
-      console.log('🔍 DEBUG: graphService.resolveVehicleIds returned:', resolved);
-      console.log('🔍 DEBUG: resolved type:', typeof resolved);
-      console.log('🔍 DEBUG: resolved is null:', resolved === null);
-      console.log('🔍 DEBUG: resolved is undefined:', resolved === undefined);
       
       // Fix: Add null check before using Object.keys
       if (resolved && typeof resolved === 'object') {
-        console.log('🔍 DEBUG: resolved is valid object, calling Object.keys...');
-        console.log('�� DEBUG: Object.keys(resolved):', Object.keys(resolved));
-        
         setVehicleNames(prev => ({ ...prev, ...resolved }));
         logger.debug('Resolved', Object.keys(resolved).length, 'vehicle names');
-        console.log('🔍 DEBUG: Vehicle names resolved successfully');
       } else {
-        console.log('❌ DEBUG: Invalid resolved object, skipping Object.keys');
         logger.warn('Invalid response from resolveVehicleIds:', resolved);
       }
     } catch (error) {
-      console.log('❌ DEBUG: Error in resolveVehicleNames:', error);
-      console.log('❌ DEBUG: Error type:', typeof error);
-      console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
-      
       logger.error('Failed to resolve vehicle names:', error);
     }
   };
 
   const resolveDriverNames = async () => {
-    console.log('🔍 DEBUG: resolveDriverNames started');
-    
     try {
       const driverMap: {[key: string]: string} = {};
-      
-      console.log('🔍 DEBUG: pendingSubmissions for driver resolution:', pendingSubmissions);
-      console.log('🔍 DEBUG: pendingSubmissions.length:', pendingSubmissions.length);
       
       // Get unique driver identifiers from submissions (these are mailNicknames)
       const uniqueDrivers = [...new Set(pendingSubmissions.map(s => s.driverName).filter(Boolean))];
       
-      console.log('🔍 DEBUG: uniqueDrivers:', uniqueDrivers);
       logger.debug('Resolving driver names for', uniqueDrivers.length, 'drivers');
       
-      console.log('🔍 DEBUG: Calling getDriversPaginated...');
       // Load drivers using new paginated approach
       const driversResult = await getDriversPaginated({ 
         excludeDeleted: true,
         limit: 100 // Load more drivers at once for mapping
       });
       
-      console.log('🔍 DEBUG: getDriversPaginated returned:', driversResult);
-      console.log('🔍 DEBUG: driversResult type:', typeof driversResult);
-      console.log('🔍 DEBUG: driversResult.items type:', typeof driversResult?.items);
-      
       // Fix: Add null check for driversResult
       if (!driversResult || !driversResult.items) {
-        console.log('❌ DEBUG: Invalid driversResult, returning early');
         logger.warn('Invalid response from getDriversPaginated');
         return;
       }
       
-      console.log('🔍 DEBUG: driversResult.items.length:', driversResult.items.length);
       logger.debug('Loaded drivers from schema:', driversResult.items.length);
       
       for (const mailNickname of uniqueDrivers) {
-        console.log('🔍 DEBUG: Processing mailNickname:', mailNickname);
-        
         // Find the driver by matching the mailNickname with the email prefix
         const matchedDriver = driversResult.items.find(driver => {
           if (!driver.mail) return false;
@@ -333,32 +292,17 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
           return emailPrefix === mailNickname.toLowerCase();
         });
         
-        console.log('🔍 DEBUG: matchedDriver for', mailNickname, ':', matchedDriver);
-        
         if (matchedDriver && matchedDriver.name) {
           driverMap[mailNickname] = matchedDriver.name;
-          console.log('🔍 DEBUG: Resolved driver name successfully for', mailNickname);
           logger.debug(`Resolved driver name successfully`);
         } else {
-          console.log('🔍 DEBUG: Could not resolve driver name for', mailNickname);
           logger.debug(`Could not resolve driver name`);
         }
       }
       
-      console.log('🔍 DEBUG: Final driverMap:', driverMap);
-      console.log('🔍 DEBUG: driverMap type:', typeof driverMap);
-      console.log('🔍 DEBUG: Calling Object.keys on driverMap...');
-      console.log('🔍 DEBUG: Object.keys(driverMap):', Object.keys(driverMap));
-      
       logger.debug('Final driver mapping completed:', Object.keys(driverMap).length, 'drivers resolved');
       setDriverNames(driverMap);
-      console.log('🔍 DEBUG: resolveDriverNames completed successfully');
     } catch (error) {
-      console.log('❌ DEBUG: Error in resolveDriverNames:', error);
-      console.log('❌ DEBUG: Error type:', typeof error);
-      console.log('❌ DEBUG: Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.log('❌ DEBUG: Error stack:', error instanceof Error ? error.stack : 'No stack');
-      
       logger.error('Error resolving driver names:', error);
     }
   };
