@@ -119,18 +119,74 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       
       logger.info('Loading initial submissions with server-side pagination...');
       
-      // FIX: Use the same approach as ApprovalManagement to avoid AWS Amplify filter inconsistency
-      // Query ALL submissions first, then filter in memory
-      const result = await getSubmissionsPaginated({
-        ...(isAdmin ? {} : { submittedBy: user?.mailNickname || user?.email }),
-        limit: 100,
-        sortDirection: 'DESC'
-      });
+      let allSubmissionsToShow: any[] = [];
+      
+      if (isAdmin) {
+        // Admin: Load ALL submissions
+        const result = await getSubmissionsPaginated({
+          limit: 100,
+          sortDirection: 'DESC'
+        });
+        allSubmissionsToShow = result.items;
+        setNextToken(result.nextToken);
+        setHasMore(result.hasMore);
+      } else {
+        // Regular user: Load both submitted and confirmed submissions
+        console.log('🔍 DEBUG: Loading submissions for regular user...');
+        
+        // 1. Load submissions submitted by user
+        const userIdentifier = user?.azureId || user?.mailNickname || user?.email;
+        console.log('🔍 DEBUG: User identifier for submittedBy query:', userIdentifier);
+        
+        const submittedResult = await getSubmissionsPaginated({
+          submittedBy: user?.mailNickname || user?.email,
+          limit: 100,
+          sortDirection: 'DESC'
+        });
+        console.log('🔍 DEBUG: Submissions submitted by user:', submittedResult.items.length);
+        
+        // 2. Load submissions confirmed by user (using fixed azureId logic)
+        let confirmedResult: any = { items: [], nextToken: null, hasMore: false };
+        try {
+          // Import the function dynamically or use existing function
+          const { getSubmissionsByConfirmerPaginated } = await import('../utils/paginationHelper');
+          confirmedResult = await getSubmissionsByConfirmerPaginated({
+            confirmerId: userIdentifier || '',
+            limit: 100,
+            sortDirection: 'DESC'
+          });
+        } catch (error) {
+          console.log('🔍 DEBUG: getSubmissionsByConfirmerPaginated not available, skipping confirmed submissions');
+        }
+        console.log('🔍 DEBUG: Submissions confirmed by user:', confirmedResult.items.length);
+        
+        // 3. Combine and deduplicate submissions
+        const submissionMap = new Map();
+        
+        // Add submitted submissions
+        submittedResult.items.forEach((sub: any) => {
+          submissionMap.set(sub.id, sub);
+        });
+        
+        // Add confirmed submissions (if not already added)
+        confirmedResult.items.forEach((sub: any) => {
+          if (!submissionMap.has(sub.id)) {
+            submissionMap.set(sub.id, sub);
+          }
+        });
+        
+        allSubmissionsToShow = Array.from(submissionMap.values());
+        console.log('🔍 DEBUG: Combined unique submissions:', allSubmissionsToShow.length);
+        
+        // Set pagination info (use submitted result for consistency)
+        setNextToken(submittedResult.nextToken);
+        setHasMore(submittedResult.hasMore);
+      }
       
       // Filter for non-rejected submissions in memory (this bypasses AWS Amplify query filter issues)
-      const nonRejectedSubmissions = result.items.filter(sub => sub.approvalStatus !== 'REJECTED');
+      const nonRejectedSubmissions = allSubmissionsToShow.filter(sub => sub.approvalStatus !== 'REJECTED');
       
-      logger.info(`Loaded ${result.items.length} total submissions, ${nonRejectedSubmissions.length} non-rejected submissions`);
+      logger.info(`Loaded ${allSubmissionsToShow.length} total submissions, ${nonRejectedSubmissions.length} non-rejected submissions`);
       
       // Check submission recency to detect if we might be missing recent submissions
       const now = new Date().getTime();
@@ -150,11 +206,9 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
       
       setCurrentSubmissions(nonRejectedSubmissions);
       setAllSubmissions(nonRejectedSubmissions); // Keep for backward compatibility
-      setNextToken(result.nextToken);
-      setHasMore(result.hasMore);
       setTotalLoaded(nonRejectedSubmissions.length);
 
-      setStatus(`✅ ${nonRejectedSubmissions.length}件の申請を読み込みました${result.hasMore ? ' (過去の申請をさらに読み込み可能)' : ''}`);
+      setStatus(`✅ ${nonRejectedSubmissions.length}件の申請を読み込みました${hasMore ? ' (過去の申請をさらに読み込み可能)' : ''}`);
       
       // Fetch related submissions for end registrations
       await fetchRelatedSubmissions(nonRejectedSubmissions);
