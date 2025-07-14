@@ -508,6 +508,28 @@ function App({ user = null }: AppProps) {
         }
       } else if (latestSubmission.approvalStatus === 'PENDING' || latestSubmission.approvalStatus === 'APPROVED') {
         logger.debug('Latest submission is approved/pending, continuing workflow');
+        
+        // 🔍 ORPHANED REGISTRATION DETECTION: Check if this is an old orphaned start registration
+        if (latestSubmission.registrationType === '運転開始登録') {
+          // Look for ANY related middle or end registrations
+          const hasRelatedSubmissions = allSubmissions.some(sub => 
+            sub.relatedSubmissionId === latestSubmission.id
+          );
+          
+          // If it's an orphaned start with no related submissions, check age
+          if (!hasRelatedSubmissions) {
+            const submissionAge = Date.now() - new Date(latestSubmission.submittedAt || '').getTime();
+            const daysOld = submissionAge / (1000 * 60 * 60 * 24);
+            
+            if (daysOld > 7) { // Orphaned for more than 7 days
+              logger.debug('Found orphaned start registration older than 7 days, allowing fresh start');
+              setCurrentWorkflowState('initial');
+              setIsWorkflowLoading(false);
+              return;
+            }
+          }
+        }
+        
         // Continue workflow normally based on approved submission
         if (latestSubmission.registrationType === '運転終了登録') {
           logger.debug('Latest is end registration, setting to initial state');

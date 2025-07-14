@@ -187,7 +187,7 @@ export class GraphService {
         displayName: userProfile.displayName,
         firstName: userProfile.givenName,
         lastName: userProfile.surname,
-        mailNickname: userProfile.mailNickname,
+        mailNickname: userProfile.mailNickname || account.username?.split('@')[0] || '',
         jobTitle: userProfile.jobTitle,
         department: userProfile.department,
         employeeId: userProfile.employeeId,
