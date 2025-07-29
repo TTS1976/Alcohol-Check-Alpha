@@ -148,7 +148,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
           const { getSubmissionsByConfirmerPaginated } = await import('../utils/paginationHelper');
           confirmedResult = await getSubmissionsByConfirmerPaginated({
             confirmerId: userIdentifier || '',
-            limit: 1000, // FIXED: Increased from 100 to 1000 to match working home page
+            limit: 20000, // FIXED: Increased to 20000 for large datasets
             sortDirection: 'DESC'
           });
         } catch (error) {

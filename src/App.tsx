@@ -41,7 +41,7 @@ interface FormData {
   destination: string;
   address: string;
   purpose: string;
-  
+
   // Safe driving declaration fields
   hasLicense: boolean;
   noAlcohol: boolean;
@@ -49,18 +49,18 @@ interface FormData {
   vehicleInspection: boolean;
   drivingRule1: string;
   drivingRule2: string;
-  
+
   // Camera section fields
   inspectionResult: string;
   communicationMessage: string;
-  
+
   // End registration specific fields
   inspectionResultEnd: string;
   communicationMessageEnd: string;
-  
+
   // Confirmer selection
   selectedConfirmer: string;
-  
+
   driverExpirationDate: string;
   imageKey: string;
   imageKeyEnd: string; // Separate image for end registration
@@ -77,7 +77,7 @@ function App({ user = null }: AppProps) {
   const [registrationType, setRegistrationType] = useState<'start' | 'middle' | 'end' | 'manual' | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
-  
+
   // Azure AD sign out functionality
   const signOut = async () => {
     try {
@@ -87,7 +87,7 @@ function App({ user = null }: AppProps) {
       window.location.reload();
     }
   };
-  
+
   // Updated form state
   const [formData, setFormData] = useState<FormData>({
     driverName: '',
@@ -115,18 +115,18 @@ function App({ user = null }: AppProps) {
 
   // Replace hardcoded options with state
   // const [vehicles, setVehicles] = useState<Array<Schema["Vehicle"]["type"]>>([]);
-  const [azureVehicles, setAzureVehicles] = useState<Array<{id: string, displayName: string, cleanName: string}>>([]);
+  const [azureVehicles, setAzureVehicles] = useState<Array<{ id: string, displayName: string, cleanName: string }>>([]);
 
-  const [availableConfirmers, setAvailableConfirmers] = useState<Array<{id: string, name: string, email: string, role: string, azureId?: string}>>([]);
-  
+  const [availableConfirmers, setAvailableConfirmers] = useState<Array<{ id: string, name: string, email: string, role: string, azureId?: string }>>([]);
+
   // Driver validation states
   const [isRegisteredDriver, setIsRegisteredDriver] = useState<boolean | null>(null); // null = checking, true = registered, false = not registered
   const [driverValidationMessage, setDriverValidationMessage] = useState<string>('');
-  
+
   // License expiration states
   const [licenseExpirationStatus, setLicenseExpirationStatus] = useState<'valid' | 'expiring_soon' | 'expired' | null>(null);
   const [licenseExpirationDate, setLicenseExpirationDate] = useState<string>('');
-  
+
   // Workflow state management
   const [currentWorkflowState, setCurrentWorkflowState] = useState<'initial' | 'needsMiddle' | 'needsEnd' | 'completed' | 'waitingForNextDay'>('initial');
   const [isWorkflowLoading, setIsWorkflowLoading] = useState(true);
@@ -140,7 +140,7 @@ function App({ user = null }: AppProps) {
     canDoIntermediate: boolean;
     isComplete: boolean;
   } | null>(null);
-  
+
   // Approval status management
   const [pendingApprovalCount, setPendingApprovalCount] = useState<number>(0);
   const [isApprovalLoading, setIsApprovalLoading] = useState(false);
@@ -184,7 +184,7 @@ function App({ user = null }: AppProps) {
 
   // User role definitions based on Azure AD authentication and database fullAdmin field
   const [userFullAdminStatus, setUserFullAdminStatus] = useState<boolean>(false);
-  
+
   // Check if current user has fullAdmin privileges in the database
   useEffect(() => {
     const checkUserFullAdminStatus = async () => {
@@ -197,17 +197,17 @@ function App({ user = null }: AppProps) {
         const userEmail = user.email || user.mailNickname + '@domain.com';
         // Use paginated query to get ALL drivers
         const allDrivers = await getAllDrivers({ excludeDeleted: true });
-        
+
         const matchedDriver = allDrivers.find(driver => {
           if (!driver.mail) return false;
           // Check both email and mailNickname matching
           const driverEmail = driver.mail.toLowerCase();
           const inputEmail = userEmail.toLowerCase();
           const inputNickname = user.mailNickname?.toLowerCase();
-          
-          return driverEmail === inputEmail || 
-                 (inputNickname && driverEmail.includes(inputNickname)) ||
-                 (inputNickname && driver.mail.split('@')[0].toLowerCase() === inputNickname);
+
+          return driverEmail === inputEmail ||
+            (inputNickname && driverEmail.includes(inputNickname)) ||
+            (inputNickname && driver.mail.split('@')[0].toLowerCase() === inputNickname);
         });
 
         logger.debug('Driver admin status determined');
@@ -221,34 +221,34 @@ function App({ user = null }: AppProps) {
     checkUserFullAdminStatus();
   }, [user]);
 
-  
+
   const isFullAdmin = user?.role === 'SafeDrivingManager' || (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept))) || userFullAdminStatus;
   const isManager = user?.role === 'Manager' || user?.role === 'SafeDrivingManager' || (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept))) || userFullAdminStatus;
   const isViewerAdmin = isManager;
   const isAnyAdmin = isFullAdmin || isViewerAdmin;
-  
+
   // Debug logging for permissions - wrapped in useEffect to prevent infinite loops
   useEffect(() => {
     logger.debug('Permission check completed');
   }, [user, userFullAdminStatus, isFullAdmin, isManager, isAnyAdmin]);
-  
-  
+
+
   const tempUser = (user?.department && ADMIN_DEPARTMENTS.some(dept => user.department.includes(dept))) ? { ...user, role: 'SafeDrivingManager' } : user;
 
   // Add this state for the clock at the top with other state declarations
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [isImageUploaded, setIsImageUploaded] = useState(false);
-  
+
   // Ref to track if driver name has been set to prevent infinite loops
   const driverNameSetRef = useRef(false);
-  
+
   // Ref for auto-scrolling to registration type selection
   const registrationTypeRef = useRef<HTMLDivElement>(null);
-  
+
   // Ref for auto-scrolling to confirmer selection
   const confirmerSelectionRef = useRef<HTMLDivElement>(null);
-  
+
   // State for mobile navigation accordion
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -281,7 +281,7 @@ function App({ user = null }: AppProps) {
     try {
       logger.debug('Loading Azure vehicles for user department');
       const vehicleUsers = await graphService.getVehicleUsers(user.department);
-      
+
       logger.debug('Loaded Azure vehicles successfully');
       setAzureVehicles(vehicleUsers);
     } catch (error) {
@@ -300,11 +300,11 @@ function App({ user = null }: AppProps) {
     }
 
     try {
-      const confirmers: Array<{id: string, name: string, email: string, role: string, azureId?: string}> = [];
+      const confirmers: Array<{ id: string, name: string, email: string, role: string, azureId?: string }> = [];
 
       // Get user's job level from the hierarchy system
       const userJobLevel = user.jobLevel || 1;
-      
+
       logger.debug('Loading confirmers for user');
 
       // For Lower-Level Employees (JobLevel < 4): Can only select higher-level confirmers
@@ -319,7 +319,7 @@ function App({ user = null }: AppProps) {
             azureId: user.manager.id
           });
         }
-        
+
         // Add department heads and managers from same department (level 4+)
         if (user.directReports && user.directReports.length > 0) {
           user.directReports.forEach((report: any) => {
@@ -412,34 +412,34 @@ function App({ user = null }: AppProps) {
 
     try {
       logger.debug('Validating driver registration for user');
-      
+
       // Get the logged-in user's email nickname
       const userNickname = user.mailNickname.toLowerCase();
-      
+
       // Load all drivers and check for match using paginated query
       const driverList = await getAllDrivers({ excludeDeleted: true });
       logger.debug('Loaded drivers for validation:', driverList.length);
-      
+
       // Check if any driver's email nickname matches the logged-in user
       const matchedDriver = driverList.find(driver => {
         if (!driver.mail) return false;
-        
+
         // Extract nickname from driver's email (part before @)
         const driverNickname = driver.mail.split('@')[0].toLowerCase();
         // Driver validation in progress
-        
+
         return driverNickname === userNickname;
       });
 
       if (matchedDriver) {
         setIsRegisteredDriver(true);
         setDriverValidationMessage('');
-        
+
         // Check license expiration status
         const expirationStatus = checkLicenseExpirationStatus(matchedDriver.expirationDate);
         setLicenseExpirationStatus(expirationStatus);
         setLicenseExpirationDate(matchedDriver.expirationDate);
-        
+
         logger.debug('Driver validation successful');
         logger.debug('License expiration status:', expirationStatus);
       } else {
@@ -467,13 +467,13 @@ function App({ user = null }: AppProps) {
     try {
       setIsWorkflowLoading(true);
       logger.debug('Checking workflow state for user');
-      
+
       // Get ALL submissions for the user using paginated query
       const allSubmissions = await getAllSubmissions({
         submittedBy: user.mailNickname,
         maxItems: 10000 // Reasonable limit for user's submissions
       });
-      
+
       logger.debug('Total submissions found:', allSubmissions.length);
 
       if (!allSubmissions || allSubmissions.length === 0) {
@@ -484,7 +484,7 @@ function App({ user = null }: AppProps) {
       }
 
       // Sort by submission date to get the most recent
-      const sortedSubmissions = allSubmissions.sort((a, b) => 
+      const sortedSubmissions = allSubmissions.sort((a, b) =>
         new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime()
       );
 
@@ -508,19 +508,19 @@ function App({ user = null }: AppProps) {
         }
       } else if (latestSubmission.approvalStatus === 'PENDING' || latestSubmission.approvalStatus === 'APPROVED') {
         logger.debug('Latest submission is approved/pending, continuing workflow');
-        
+
         // 🔍 ORPHANED REGISTRATION DETECTION: Check if this is an old orphaned start registration
         if (latestSubmission.registrationType === '運転開始登録') {
           // Look for ANY related middle or end registrations
-          const hasRelatedSubmissions = allSubmissions.some(sub => 
+          const hasRelatedSubmissions = allSubmissions.some(sub =>
             sub.relatedSubmissionId === latestSubmission.id
           );
-          
+
           // If it's an orphaned start with no related submissions, check age
           if (!hasRelatedSubmissions) {
             const submissionAge = Date.now() - new Date(latestSubmission.submittedAt || '').getTime();
             const daysOld = submissionAge / (1000 * 60 * 60 * 24);
-            
+
             if (daysOld > 7) { // Orphaned for more than 7 days
               logger.debug('Found orphaned start registration older than 7 days, allowing fresh start');
               setCurrentWorkflowState('initial');
@@ -529,20 +529,20 @@ function App({ user = null }: AppProps) {
             }
           }
         }
-        
+
         // Continue workflow normally based on approved submission
         if (latestSubmission.registrationType === '運転終了登録') {
           logger.debug('Latest is end registration, setting to initial state');
           setCurrentWorkflowState('initial');
         } else if (latestSubmission.registrationType === '中間点呼登録') {
           logger.debug('Latest is middle registration, checking trip progress');
-          
+
           const progress = await getTripProgress(latestSubmission.driverName || '');
           setTripProgress(progress);
-          
+
           if (progress) {
             logger.debug('Trip progress calculated');
-            
+
             if (progress.isComplete) {
               logger.debug('All intermediates completed, enabling end registration');
               setCurrentWorkflowState('needsEnd');
@@ -561,17 +561,17 @@ function App({ user = null }: AppProps) {
           // Check if intermediate roll calls are needed based on trip duration
           const boardingDate = new Date(latestSubmission.boardingDateTime || '');
           const alightingDate = new Date(latestSubmission.alightingDateTime || '');
-          
+
           // Calculate the number of calendar days between boarding and alighting
           const boardingDateOnly = new Date(boardingDate.getFullYear(), boardingDate.getMonth(), boardingDate.getDate());
           const alightingDateOnly = new Date(alightingDate.getFullYear(), alightingDate.getMonth(), alightingDate.getDate());
           const daysDiff = Math.ceil((alightingDateOnly.getTime() - boardingDateOnly.getTime()) / (1000 * 3600 * 24)) + 1;
-          
+
           logger.debug('Trip duration analysis:');
           logger.debug('Boarding date:', boardingDate.toDateString());
           logger.debug('Alighting date:', alightingDate.toDateString());
           logger.debug('Days difference:', daysDiff);
-          
+
           // Intermediate roll calls are required for trips of 3+ calendar days (2+ nights)
           // Examples:
           // - 5/26～5/26 (same day, 1 calendar day): No intermediate needed
@@ -580,11 +580,11 @@ function App({ user = null }: AppProps) {
           // - 5/26～5/30 (4 nights, 5 calendar days): 4 intermediates needed on 27th, 28th, 29th, and 30th
           if (daysDiff >= 3) {
             logger.debug('Trip is 3+ calendar days (2+ nights), intermediate roll calls required');
-            
+
             // Get trip progress for this driver
             const progress = await getTripProgress(latestSubmission.driverName || '');
             setTripProgress(progress);
-            
+
             if (progress && progress.canDoIntermediate) {
               setCurrentWorkflowState('needsMiddle');
             } else if (progress && progress.hasIntermediateToday && !progress.isAlightingDay) {
@@ -624,7 +624,7 @@ function App({ user = null }: AppProps) {
     try {
       setIsApprovalLoading(true);
       logger.debug('Checking for pending approval requests...');
-      
+
       // Fix: Use azureId first since that's what's stored as confirmerId in the database
       const userIdentifier = user?.azureId || user?.id || user?.objectId || user?.mailNickname || user?.email;
       if (!userIdentifier) {
@@ -635,7 +635,7 @@ function App({ user = null }: AppProps) {
 
       // Check if user is a SafeDrivingManager (can see all pending submissions)
       const isSafeDrivingManager = checkUserRole('SafeDrivingManager');
-      
+
       let result;
       if (isSafeDrivingManager) {
         // Admin: fetch all pending submissions
@@ -649,10 +649,10 @@ function App({ user = null }: AppProps) {
         result = await getSubmissionsByConfirmerPaginated({
           confirmerId: userIdentifier,
           approvalStatus: 'PENDING',
-          limit: 1000
+          limit: 20000 // FIXED: Increased to 20000 for large datasets
         });
       }
-      
+
       const pendingCount = result.items.length;
       logger.debug(`Found ${pendingCount} pending approval requests`);
       setPendingApprovalCount(pendingCount);
@@ -672,13 +672,13 @@ function App({ user = null }: AppProps) {
 
     return () => clearInterval(timer);
   }, []);
-  
+
   useEffect(() => {
     // Load vehicles
     loadVehicles();
     loadAzureVehicles(); // Load vehicles from Azure AD
     loadAvailableConfirmers();
-    
+
     // Validate driver registration when user data is available
     if (user && user.mailNickname) {
       validateDriverRegistration();
@@ -689,19 +689,19 @@ function App({ user = null }: AppProps) {
   useEffect(() => {
     if (user && !formData.driverName && !driverNameSetRef.current) {
       // Use displayName first, then fallback to mailNickname for system compatibility
-      const driverName = user.displayName || 
-                        user.mailNickname || 
-                        user.email?.split('@')[0] || 
-                        user.userPrincipalName?.split('@')[0] ||
-                        'unknown-user';
-      
+      const driverName = user.displayName ||
+        user.mailNickname ||
+        user.email?.split('@')[0] ||
+        user.userPrincipalName?.split('@')[0] ||
+        'unknown-user';
+
       logger.debug('Auto-setting driver name from user data - driver set successfully');
-      
-      setFormData(prev => ({ 
-        ...prev, 
-        driverName 
+
+      setFormData(prev => ({
+        ...prev,
+        driverName
       }));
-      
+
       driverNameSetRef.current = true;
     }
   }, [user]); // Removed formData.driverName dependency to prevent infinite loops, using ref instead
@@ -728,7 +728,7 @@ function App({ user = null }: AppProps) {
         return null;
       }
 
-      const latestStart = driverStartSubmissions.sort((a, b) => 
+      const latestStart = driverStartSubmissions.sort((a, b) =>
         new Date(b.submittedAt || '').getTime() - new Date(a.submittedAt || '').getTime()
       )[0];
 
@@ -803,14 +803,14 @@ function App({ user = null }: AppProps) {
 
   // Auto-scroll to registration type selection when user logs in and data is loaded
   useEffect(() => {
-    if (user && 
-        isRegisteredDriver !== null && 
-        !isWorkflowLoading && 
-        registrationTypeRef.current &&
-        currentView === 'main' &&
-        !showForm &&
-        !showManualForm) {
-      
+    if (user &&
+      isRegisteredDriver !== null &&
+      !isWorkflowLoading &&
+      registrationTypeRef.current &&
+      currentView === 'main' &&
+      !showForm &&
+      !showManualForm) {
+
       // Small delay to ensure DOM is fully rendered
       const scrollTimer = setTimeout(() => {
         registrationTypeRef.current?.scrollIntoView({
@@ -826,10 +826,10 @@ function App({ user = null }: AppProps) {
 
   // Auto-scroll to confirmer selection for middle and end registrations
   useEffect(() => {
-    if (showForm && 
-        (registrationType === 'middle' || registrationType === 'end') &&
-        confirmerSelectionRef.current) {
-      
+    if (showForm &&
+      (registrationType === 'middle' || registrationType === 'end') &&
+      confirmerSelectionRef.current) {
+
       // Small delay to ensure DOM is fully rendered
       const scrollTimer = setTimeout(() => {
         confirmerSelectionRef.current?.scrollIntoView({
@@ -855,7 +855,7 @@ function App({ user = null }: AppProps) {
       setFormData(prev => ({ ...prev, [field]: numericValue }));
       return;
     }
-    
+
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -869,17 +869,17 @@ function App({ user = null }: AppProps) {
   ) => {
     try {
       logger.debug('Sending Teams notification...');
-      
+
       // Check if GraphService is available
       if (!graphService) {
         logger.warn('GraphService not available for Teams notification');
         return;
       }
-      
+
       // Get AWS credentials and Microsoft Graph access token
       const session = await fetchAuthSession();
       const credentials = session.credentials;
-      
+
       if (!credentials) {
         throw new Error('No AWS credentials available');
       }
@@ -888,12 +888,12 @@ function App({ user = null }: AppProps) {
       let userAccessToken: string | null = null;
       try {
         userAccessToken = await graphService.getAccessToken();
-        
+
         // Validate token without exposing sensitive information
         if (!userAccessToken || userAccessToken.length < 10) {
           throw new Error('Invalid access token received');
         }
-        
+
         logger.debug('Successfully obtained and validated Microsoft Graph access token');
       } catch (tokenError) {
         logger.error('Failed to get Microsoft Graph access token:', tokenError);
@@ -930,7 +930,7 @@ function App({ user = null }: AppProps) {
       });
 
       const response = await lambdaClient.send(command);
-      
+
       if (response.StatusCode === 200) {
         // Check the response payload for any errors
         if (response.Payload) {
@@ -954,10 +954,10 @@ function App({ user = null }: AppProps) {
       // Determine driving status and related submission ID
       let drivingStatus = "運転中";
       let relatedSubmissionId = null;
-      
+
       // Determine submittedBy value consistently (moved up to use in filtering)
       const submittedByValue = user?.mailNickname || user?.email || user?.userPrincipalName || formData.driverName || 'test-user';
-      
+
       if (registrationType === 'end') {
         drivingStatus = "運転終了";
         // Find the latest start registration for this driver using submittedBy for accurate matching
@@ -966,7 +966,7 @@ function App({ user = null }: AppProps) {
           submittedBy: submittedByValue, // Use submittedBy instead of filtering by driverName
           maxItems: 50 // Reduced since we're filtering by user
         });
-        
+
         if (startSubmissions && startSubmissions.length > 0) {
           const latestStart = startSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
           relatedSubmissionId = latestStart.id;
@@ -978,7 +978,7 @@ function App({ user = null }: AppProps) {
           submittedBy: submittedByValue, // Use submittedBy instead of filtering by driverName
           maxItems: 50 // Reduced since we're filtering by user
         });
-        
+
         if (startSubmissions && startSubmissions.length > 0) {
           // Sort by submittedAt descending and pick the latest
           const latestStart = startSubmissions.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
@@ -988,13 +988,13 @@ function App({ user = null }: AppProps) {
 
       // Get confirmer information
       const selectedConfirmer = availableConfirmers.find(c => c.id === formData.selectedConfirmer);
-      
 
-      
+
+
       // For start, middle, and end registrations, create new submissions
       const submissionData: any = {
-        registrationType: registrationType === 'start' ? '運転開始登録' : 
-                         registrationType === 'middle' ? '中間点呼登録' : '運転終了登録',
+        registrationType: registrationType === 'start' ? '運転開始登録' :
+          registrationType === 'middle' ? '中間点呼登録' : '運転終了登録',
         drivingStatus: drivingStatus,
         relatedSubmissionId: relatedSubmissionId,
         driverName: formData.driverName || 'test-driver', // Fallback for testing
@@ -1012,7 +1012,7 @@ function App({ user = null }: AppProps) {
         // Store Azure AD display name for proper @mentions
         driverDisplayName: user?.displayName || formData.driverName || 'Unknown Driver',
       };
-      
+
 
 
       // Add fields based on registration type
@@ -1021,7 +1021,7 @@ function App({ user = null }: AppProps) {
         submissionData.inspectionResultEnd = formData.inspectionResultEnd;
         submissionData.communicationMessageEnd = formData.communicationMessageEnd;
         submissionData.imageKeyEnd = formData.imageKeyEnd;
-        
+
         // Also copy vehicle and safety data from the related start registration if available
         if (relatedSubmissionId) {
           try {
@@ -1064,7 +1064,7 @@ function App({ user = null }: AppProps) {
         submissionData.focusOnDriving = formData.focusOnDriving || true;
         submissionData.vehicleInspection = formData.vehicleInspection || true;
         submissionData.drivingRule1 = formData.drivingRule1;
-        submissionData.drivingRule2 = formData.drivingRule2; 
+        submissionData.drivingRule2 = formData.drivingRule2;
         submissionData.inspectionResult = formData.inspectionResult;
         submissionData.communicationMessage = formData.communicationMessage;
         // Only include imageKey if it's not empty
@@ -1072,9 +1072,9 @@ function App({ user = null }: AppProps) {
           submissionData.imageKey = formData.imageKey;
         }
       }
-      
+
       const result = await client.models.AlcoholCheckSubmission.create(submissionData);
-      
+
       // If this is an end registration, update the related submission status
       if (registrationType === 'end' && relatedSubmissionId) {
         await client.models.AlcoholCheckSubmission.update({
@@ -1082,9 +1082,9 @@ function App({ user = null }: AppProps) {
           drivingStatus: "運転終了"
         });
       }
-      
+
       setUploadStatus("提出が完了しました！承認待ちです。");
-      
+
       // Reset form but preserve driver name (auto-populated from Azure AD)
       const currentDriverName = formData.driverName;
       setFormData({
@@ -1110,43 +1110,43 @@ function App({ user = null }: AppProps) {
         imageKey: '',
         imageKeyEnd: ''
       });
-      
+
       // Reset form states
       setIsImageUploaded(false);
       setIsImageUploading(false);
-      
+
       // Refresh workflow state after successful submission
       await checkUserWorkflowState();
       await checkPendingApprovals();
-      
+
       // Show success message and redirect to home after 2 seconds
       setTimeout(() => {
         setShowForm(false);
         setRegistrationType(null);
         setUploadStatus(null);
       }, 2000);
-      
+
       // Call Teams notification for all registration types
       if (result.data) {
         const confirmerName = selectedConfirmer?.name || 'Unknown Confirmer';
-        
+
         // Use the driver name from Azure AD (user.displayName) instead of database lookup
         const actualDriverName = user?.displayName || formData.driverName || 'Unknown Driver';
-        
+
         // Get inspection result based on registration type
-        const inspectionResult = (registrationType === 'end' || registrationType === 'middle') 
+        const inspectionResult = (registrationType === 'end' || registrationType === 'middle')
           ? formData.inspectionResultEnd || '0.00'
           : formData.inspectionResult || '0.00';
-        
+
         // Get registration type name for notification
-        const registrationTypeName = registrationType === 'start' ? '運転開始登録' : 
-                                    registrationType === 'middle' ? '中間点呼登録' : '運転終了登録';
-        
+        const registrationTypeName = registrationType === 'start' ? '運転開始登録' :
+          registrationType === 'middle' ? '中間点呼登録' : '運転終了登録';
+
         const notificationContent = `登録タイプ: ${registrationTypeName}\n運転手名前: ${actualDriverName}\n検査結果: ${inspectionResult} mg\n確認者: ${confirmerName}`;
-        
+
         await sendTeamsNotificationToConfirmer(result.data.id, notificationContent, user?.mailNickname || user?.displayName || "unknown", confirmerName, selectedConfirmer);
       }
-      
+
     } catch (error) {
       setUploadStatus(`提出に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -1157,19 +1157,19 @@ function App({ user = null }: AppProps) {
       setIsImageUploading(true);
       setIsImageUploaded(false);
       setUploadStatus('少々お待ちください');
-      
+
       // Extract base64 data from data URL
       const base64Data = imageData.split(',')[1];
-      
+
       // Create a unique filename using timestamp
       const fileName = `${user?.mailNickname || 'unknown'}_${Date.now()}.jpg`;
-      
+
       // Try to upload using Lambda with guest credentials
       try {
         // Get AWS credentials (works for both authenticated and unauthenticated users)
         const session = await fetchAuthSession();
         const credentials = session.credentials;
-        
+
         if (!credentials) {
           throw new Error('No AWS credentials available');
         }
@@ -1195,26 +1195,26 @@ function App({ user = null }: AppProps) {
         });
 
         const response = await lambdaClient.send(command);
-        
+
         if (response.StatusCode === 200) {
           const result = JSON.parse(new TextDecoder().decode(response.Payload));
-          
+
           // Handle nested response structure
           let actualResult = result;
           if (result.statusCode === 200 && result.body) {
             actualResult = JSON.parse(result.body);
           }
-          
+
           if (actualResult.success) {
             setUploadStatus('画像のアップロードが完了しました！');
-            
+
             // Set the appropriate image key based on registration type
             if (registrationType === 'end' || registrationType === 'middle') {
               setFormData(prev => ({ ...prev, imageKeyEnd: actualResult.fileId || fileName }));
             } else {
               setFormData(prev => ({ ...prev, imageKey: actualResult.fileId || fileName }));
             }
-            
+
             setIsImageUploaded(true);
           } else {
             throw new Error(actualResult.error || 'Upload failed');
@@ -1222,20 +1222,20 @@ function App({ user = null }: AppProps) {
         } else {
           throw new Error(`Lambda function returned status: ${response.StatusCode}`);
         }
-        
+
       } catch (lambdaError) {
         // Fallback: Set dummy image key for form completion
         setUploadStatus('画像アップロード機能は一時的に制限されています（ダミーファイル名を設定）');
-        
+
         if (registrationType === 'end' || registrationType === 'middle') {
           setFormData(prev => ({ ...prev, imageKeyEnd: fileName }));
         } else {
           setFormData(prev => ({ ...prev, imageKey: fileName }));
         }
-        
+
         setIsImageUploaded(true);
       }
-      
+
     } catch (error) {
       setUploadStatus(`画像アップロードエラー: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsImageUploaded(false);
@@ -1257,24 +1257,24 @@ function App({ user = null }: AppProps) {
   };
 
   // Check if vehicle form is valid - driver name is always populated from Azure AD
-  const isVehicleFormValid = registrationType === 'end' 
+  const isVehicleFormValid = registrationType === 'end'
     ? true // For end registration, driver name is auto-populated from Azure AD
-    : formData.vehicle.trim() !== '' && 
-      formData.boardingDateTime.trim() !== '' && 
-      formData.alightingDateTime.trim() !== '' && 
-      formData.destination.trim() !== '' && 
-      formData.address.trim() !== '' && 
-      formData.purpose.trim() !== '';
+    : formData.vehicle.trim() !== '' &&
+    formData.boardingDateTime.trim() !== '' &&
+    formData.alightingDateTime.trim() !== '' &&
+    formData.destination.trim() !== '' &&
+    formData.address.trim() !== '' &&
+    formData.purpose.trim() !== '';
 
   // Check if safety declaration is valid
-  const isSafetyFormValid = registrationType === 'end' 
+  const isSafetyFormValid = registrationType === 'end'
     ? true // For end registration, safety declaration is not required
-    : formData.hasLicense && 
-      formData.noAlcohol && 
-      formData.focusOnDriving && 
-      formData.vehicleInspection && 
-      formData.drivingRule1.trim() !== '' && 
-      formData.drivingRule2.trim() !== '';
+    : formData.hasLicense &&
+    formData.noAlcohol &&
+    formData.focusOnDriving &&
+    formData.vehicleInspection &&
+    formData.drivingRule1.trim() !== '' &&
+    formData.drivingRule2.trim() !== '';
 
   // Check if inspection result is valid
   // const isInspectionValid = registrationType === 'end' || registrationType === 'middle'
@@ -1285,15 +1285,15 @@ function App({ user = null }: AppProps) {
   // Image upload is now required again for form submission
   const isFormValid = (registrationType === 'end' || registrationType === 'middle')
     ? formData.inspectionResultEnd.trim() !== '' &&
-      formData.selectedConfirmer.trim() !== '' &&
-      isInspectionResultValid(formData.inspectionResultEnd) &&
-      isImageUploaded
+    formData.selectedConfirmer.trim() !== '' &&
+    isInspectionResultValid(formData.inspectionResultEnd) &&
+    isImageUploaded
     : isVehicleFormValid &&
-      isSafetyFormValid &&
-      formData.inspectionResult.trim() !== '' &&
-      formData.selectedConfirmer.trim() !== '' &&
-      isInspectionResultValid(formData.inspectionResult) &&
-      isImageUploaded;
+    isSafetyFormValid &&
+    formData.inspectionResult.trim() !== '' &&
+    formData.selectedConfirmer.trim() !== '' &&
+    isInspectionResultValid(formData.inspectionResult) &&
+    isImageUploaded;
 
   // Disable picture requirement
   // const isFormValid = (registrationType === 'end' || registrationType === 'middle')
@@ -1314,19 +1314,19 @@ function App({ user = null }: AppProps) {
     const currentDate = new Date();
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(currentDate.getMonth() + 3);
-    
+
     return expDate <= threeMonthsFromNow;
   };
 
   // Add function to check license expiration status (2 months for warning instead of 3)
   const checkLicenseExpirationStatus = (expirationDate: string): 'valid' | 'expiring_soon' | 'expired' => {
     if (!expirationDate) return 'valid';
-    
+
     const expDate = new Date(expirationDate);
     const currentDate = new Date();
     const twoMonthsFromNow = new Date();
     twoMonthsFromNow.setMonth(currentDate.getMonth() + 2);
-    
+
     if (expDate <= currentDate) {
       return 'expired';
     } else if (expDate <= twoMonthsFromNow) {
@@ -1342,21 +1342,21 @@ function App({ user = null }: AppProps) {
     if (type === 'start' && !isStartButtonEnabled()) return;
     if (type === 'middle' && !isMiddleButtonEnabled()) return;
     if (type === 'end' && !isEndButtonEnabled()) return;
-    
+
     if (type === 'manual') {
       // Manual registration is available to registered drivers with valid licenses
       if (isRegisteredDriver !== true || licenseExpirationStatus === 'expired') return;
       setShowManualForm(true);
       return;
     }
-    
+
     setRegistrationType(type);
     setShowForm(true);
   };
 
   // Function to get registration type title
   const getRegistrationTitle = () => {
-    switch(registrationType) {
+    switch (registrationType) {
       case 'start': return '運転開始登録';
       case 'middle': return '中間点呼登録';
       case 'end': return '運転終了登録';
@@ -1407,7 +1407,7 @@ function App({ user = null }: AppProps) {
     setUploadStatus(null);
     setIsImageUploading(false);
     setIsImageUploaded(false);
-    
+
     // Refresh workflow state when returning to main view
     if (user && user.mailNickname) {
       checkUserWorkflowState();
@@ -1416,32 +1416,31 @@ function App({ user = null }: AppProps) {
 
   // Helper functions to determine button availability based on workflow state and license expiration
   const isStartButtonEnabled = () => {
-    return isRegisteredDriver === true && 
-           currentWorkflowState === 'initial' && 
-           !isWorkflowLoading && 
-           licenseExpirationStatus !== 'expired';
+    return isRegisteredDriver === true &&
+      currentWorkflowState === 'initial' &&
+      !isWorkflowLoading &&
+      licenseExpirationStatus !== 'expired';
   };
 
   const isMiddleButtonEnabled = () => {
-    return isRegisteredDriver === true && 
-           currentWorkflowState === 'needsMiddle' && 
-           !isWorkflowLoading && 
-           licenseExpirationStatus !== 'expired';
+    return isRegisteredDriver === true &&
+      currentWorkflowState === 'needsMiddle' &&
+      !isWorkflowLoading &&
+      licenseExpirationStatus !== 'expired';
   };
 
   const isEndButtonEnabled = () => {
-    return isRegisteredDriver === true && 
-           currentWorkflowState === 'needsEnd' && 
-           !isWorkflowLoading && 
-           licenseExpirationStatus !== 'expired';
+    return isRegisteredDriver === true &&
+      currentWorkflowState === 'needsEnd' &&
+      !isWorkflowLoading &&
+      licenseExpirationStatus !== 'expired';
   };
 
   const getButtonClassName = (isEnabled: boolean) => {
-    return `group transform transition-all duration-300 ${
-      isEnabled 
-        ? 'cursor-pointer hover:scale-105' 
-        : 'cursor-not-allowed opacity-50 grayscale'
-    }`;
+    return `group transform transition-all duration-300 ${isEnabled
+      ? 'cursor-pointer hover:scale-105'
+      : 'cursor-not-allowed opacity-50 grayscale'
+      }`;
   };
 
   // Removed duplicate handleSubmit function - using handleFormSubmission instead
@@ -1453,44 +1452,43 @@ function App({ user = null }: AppProps) {
 
   // Main render logic
   if (currentView === 'main') {
-  return (
+    return (
       <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4">
         <div className="max-w-6xl mx-auto">
           {/* Enhanced Header */}
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-6 mb-8 transform hover:scale-[1.01] transition-all duration-300">
-                          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-                <div className="space-y-2">
-                  <h1 className="text-xl lg:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
-                    <img src={teralSafetyIcon} alt="Teral Safety" className="w-14 h-15 lg:w-20 lg:h-15" />
-                    TTSグループ運行管理システム
-                  </h1>
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+              <div className="space-y-2">
+                <h1 className="text-xl lg:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
+                  <img src={teralSafetyIcon} alt="Teral Safety" className="w-14 h-15 lg:w-20 lg:h-15" />
+                  TTSグループ運行管理システム
+                </h1>
                 <div className="flex flex-col gap-1 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                     <span>ログイン中: {user?.displayName || 'ユーザー'}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      isRegisteredDriver === true 
-                        ? 'bg-green-100 text-green-700' 
-                        : isRegisteredDriver === false 
-                        ? 'bg-red-100 text-red-700' 
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${isRegisteredDriver === true
+                      ? 'bg-green-100 text-green-700'
+                      : isRegisteredDriver === false
+                        ? 'bg-red-100 text-red-700'
                         : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {isRegisteredDriver === true 
-                        ? 'ユーザー登録済み' 
-                        : isRegisteredDriver === false 
-                        ? 'ユーザー未登録' 
-                        : '確認中...'}
+                      }`}>
+                      {isRegisteredDriver === true
+                        ? 'ユーザー登録済み'
+                        : isRegisteredDriver === false
+                          ? 'ユーザー未登録'
+                          : '確認中...'}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">
                     {user?.jobTitle && `${user.jobTitle} | `}
                     {user?.department && `${user.department} | `}
-                    役割: {user?.role === 'SafeDrivingManager' ? '安全運転管理者' : 
-                          user?.role === 'Manager' ? '管理者' : '一般職員'}
+                    役割: {user?.role === 'SafeDrivingManager' ? '安全運転管理者' :
+                      user?.role === 'Manager' ? '管理者' : '一般職員'}
                   </div>
                 </div>
               </div>
-              
+
               {/* Navigation Buttons - Mobile Accordion & Desktop Grid */}
               <div className="space-y-3">
                 {/* Mobile Accordion Toggle - Only visible on mobile */}
@@ -1514,9 +1512,8 @@ function App({ user = null }: AppProps) {
                 </div>
 
                 {/* Mobile Accordion Content */}
-                <div className={`md:hidden overflow-hidden transition-all duration-300 ${
-                  isMobileNavOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                }`}>
+                <div className={`md:hidden overflow-hidden transition-all duration-300 ${isMobileNavOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                  }`}>
                   <div className="space-y-2 p-2 bg-white/5 rounded-xl backdrop-blur-sm">
                     {/* License Renewal - Mobile */}
                     {isRegisteredDriver === true && (
@@ -1533,7 +1530,7 @@ function App({ user = null }: AppProps) {
                         <span className="text-sm font-medium text-gray-700">免許証更新</span>
                       </button>
                     )}
-                    
+
                     {/* Approval Management - Mobile */}
                     <button
                       onClick={() => {
@@ -1547,7 +1544,7 @@ function App({ user = null }: AppProps) {
                       </div>
                       <span className="text-sm font-medium text-gray-700">承認管理</span>
                     </button>
-                    
+
                     {/* Safety Management - Mobile */}
                     <button
                       onClick={() => {
@@ -1561,7 +1558,7 @@ function App({ user = null }: AppProps) {
                       </div>
                       <span className="text-sm font-medium text-gray-700">安全運転管理</span>
                     </button>
-                    
+
                     {/* Admin Actions - Mobile */}
                     {isFullAdmin && (
                       <>
@@ -1577,7 +1574,7 @@ function App({ user = null }: AppProps) {
                           </div>
                           <span className="text-sm font-medium text-gray-700">ドライバー管理</span>
                         </button>
-                        
+
                         <button
                           onClick={() => {
                             setCurrentView('tempcsv');
@@ -1592,7 +1589,7 @@ function App({ user = null }: AppProps) {
                         </button>
                       </>
                     )}
-                    
+
                     {/* Sign Out - Mobile */}
                     <div className="pt-2 border-t border-white/10">
                       <button
@@ -1632,7 +1629,7 @@ function App({ user = null }: AppProps) {
                         </div>
                       </button>
                     )}
-                    
+
                     {/* Approval Management */}
                     <button
                       onClick={() => setCurrentView('approvals')}
@@ -1645,7 +1642,7 @@ function App({ user = null }: AppProps) {
                         <span className="text-sm font-medium text-gray-700 text-center leading-tight">承認管理</span>
                       </div>
                     </button>
-                    
+
                     {/* Safety Management */}
                     <button
                       onClick={() => setCurrentView('safety')}
@@ -1661,7 +1658,7 @@ function App({ user = null }: AppProps) {
                         </span>
                       </div>
                     </button>
-                    
+
                     {/* Admin Actions */}
                     {isFullAdmin && (
                       <>
@@ -1679,7 +1676,7 @@ function App({ user = null }: AppProps) {
                             </span>
                           </div>
                         </button>
-                        
+
                         <button
                           onClick={() => setCurrentView('tempcsv')}
                           className="group relative flex-1 lg:flex-none backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl"
@@ -1697,7 +1694,7 @@ function App({ user = null }: AppProps) {
                       </>
                     )}
                   </div>
-                  
+
                   {/* Sign Out Row - Standalone */}
                   <div className="flex justify-center lg:justify-end mt-3">
                     <button
@@ -1806,7 +1803,7 @@ function App({ user = null }: AppProps) {
                 <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                   適切な登録タイプを選択して、安全運転を開始しましょう
                 </p>
-                
+
                 {/* Driver Validation Status */}
                 {isRegisteredDriver === null && (
                   <div className="bg-blue-100 border border-blue-300 text-blue-700 px-4 py-3 rounded-lg max-w-2xl mx-auto">
@@ -1816,7 +1813,7 @@ function App({ user = null }: AppProps) {
                     </div>
                   </div>
                 )}
-                
+
                 {isWorkflowLoading && isRegisteredDriver === true && (
                   <div className="bg-amber-100 border border-amber-300 text-amber-700 px-4 py-3 rounded-lg max-w-2xl mx-auto">
                     <div className="flex items-center gap-2">
@@ -1825,7 +1822,7 @@ function App({ user = null }: AppProps) {
                     </div>
                   </div>
                 )}
-                
+
                 {isRegisteredDriver === false && (
                   <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg max-w-2xl mx-auto">
                     <div className="flex items-center gap-2">
@@ -1837,7 +1834,7 @@ function App({ user = null }: AppProps) {
                     </div>
                   </div>
                 )}
-                
+
                 {isRegisteredDriver === true && !isWorkflowLoading && (
                   <div className="space-y-4 max-w-2xl mx-auto">
                     <div className="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg">
@@ -1847,25 +1844,25 @@ function App({ user = null }: AppProps) {
                           <p className="font-semibold">
                             現在の状態: {
                               currentWorkflowState === 'initial' ? '運転開始登録が可能です' :
-                              currentWorkflowState === 'needsMiddle' ? '中間点呼登録が必要です' :
-                              currentWorkflowState === 'needsEnd' ? '運転終了登録が可能です' :
-                              currentWorkflowState === 'waitingForNextDay' ? '今日の中間点呼登録は完了済みです' :
-                              '不明な状態'
+                                currentWorkflowState === 'needsMiddle' ? '中間点呼登録が必要です' :
+                                  currentWorkflowState === 'needsEnd' ? '運転終了登録が可能です' :
+                                    currentWorkflowState === 'waitingForNextDay' ? '今日の中間点呼登録は完了済みです' :
+                                      '不明な状態'
                             }
                           </p>
                           <p className="text-sm">
                             {
                               currentWorkflowState === 'initial' ? '新しい運転を開始できます。' :
-                              currentWorkflowState === 'needsMiddle' ? '運転開始登録の降車日時が翌日以降のため、中間点呼登録が必要です。' :
-                              currentWorkflowState === 'needsEnd' ? '運転を終了してください。' :
-                              currentWorkflowState === 'waitingForNextDay' ? '明日以降に次の中間点呼登録を行ってください。' :
-                              '管理者にお問い合わせください。'
+                                currentWorkflowState === 'needsMiddle' ? '運転開始登録の降車日時が翌日以降のため、中間点呼登録が必要です。' :
+                                  currentWorkflowState === 'needsEnd' ? '運転を終了してください。' :
+                                    currentWorkflowState === 'waitingForNextDay' ? '明日以降に次の中間点呼登録を行ってください。' :
+                                      '管理者にお問い合わせください。'
                             }
                           </p>
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* License Expiration Status */}
                     {licenseExpirationStatus === 'expired' && (
                       <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg">
@@ -1876,7 +1873,7 @@ function App({ user = null }: AppProps) {
                               免許証が期限切れです
                             </p>
                             <p className="text-center">
-                              免許証の有効期限が切れているため、すべての登録フォームは利用できません。<br/>
+                              免許証の有効期限が切れているため、すべての登録フォームは利用できません。<br />
                               更新後、「免許証更新」ボタンから更新手続きを行ってください。
                             </p>
                             {licenseExpirationDate && (
@@ -1888,7 +1885,7 @@ function App({ user = null }: AppProps) {
                         </div>
                       </div>
                     )}
-                    
+
                     {licenseExpirationStatus === 'expiring_soon' && (
                       <div className="bg-yellow-100 border border-yellow-300 text-yellow-700 px-4 py-3 rounded-lg">
                         <div className="flex items-center gap-2">
@@ -1909,7 +1906,7 @@ function App({ user = null }: AppProps) {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Trip Progress Display */}
                     {tripProgress && (currentWorkflowState === 'needsMiddle' || currentWorkflowState === 'needsEnd' || currentWorkflowState === 'waitingForNextDay') && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1936,7 +1933,7 @@ function App({ user = null }: AppProps) {
                             <div className="text-gray-600">状態</div>
                           </div>
                         </div>
-                        
+
                         {/* Progress Bar */}
                         <div className="mt-3">
                           <div className="flex justify-between text-xs text-gray-600 mb-1">
@@ -1944,15 +1941,15 @@ function App({ user = null }: AppProps) {
                             <span>{tripProgress.completedIntermediates}/{tripProgress.totalIntermediatesNeeded} 完了</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
+                            <div
                               className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                              style={{ 
-                                width: `${Math.min(100, (tripProgress.completedIntermediates / Math.max(1, tripProgress.totalIntermediatesNeeded)) * 100)}%` 
+                              style={{
+                                width: `${Math.min(100, (tripProgress.completedIntermediates / Math.max(1, tripProgress.totalIntermediatesNeeded)) * 100)}%`
                               }}
                             ></div>
                           </div>
                         </div>
-                        
+
                         {/* Special Messages */}
                         {tripProgress?.hasIntermediateToday && !tripProgress?.isAlightingDay && (
                           <div className="mt-2 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded">
@@ -1974,11 +1971,11 @@ function App({ user = null }: AppProps) {
                   </div>
                 )}
               </div>
-              
+
               {/* Enhanced Registration Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 flex-1">
                 {/* Start Registration Card */}
-                <div 
+                <div
                   onClick={() => isStartButtonEnabled() && handleRegistrationTypeSelect('start')}
                   className={getButtonClassName(isStartButtonEnabled())}
                 >
@@ -1987,7 +1984,7 @@ function App({ user = null }: AppProps) {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
                     <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
                     <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full"></div>
-                    
+
                     {/* Content */}
                     <div className="relative z-10 text-center text-white space-y-4 h-full flex flex-col justify-center">
                       <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
@@ -2008,7 +2005,7 @@ function App({ user = null }: AppProps) {
                 </div>
 
                 {/* Middle Registration Card */}
-                <div 
+                <div
                   onClick={() => isMiddleButtonEnabled() && handleRegistrationTypeSelect('middle')}
                   className={getButtonClassName(isMiddleButtonEnabled())}
                 >
@@ -2017,7 +2014,7 @@ function App({ user = null }: AppProps) {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
                     <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
                     <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full"></div>
-                    
+
                     {/* Content */}
                     <div className="relative z-10 text-center text-white space-y-4 h-full flex flex-col justify-center">
                       <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
@@ -2038,7 +2035,7 @@ function App({ user = null }: AppProps) {
                 </div>
 
                 {/* End Registration Card */}
-                <div 
+                <div
                   onClick={() => isEndButtonEnabled() && handleRegistrationTypeSelect('end')}
                   className={getButtonClassName(isEndButtonEnabled())}
                 >
@@ -2047,7 +2044,7 @@ function App({ user = null }: AppProps) {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
                     <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
                     <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full"></div>
-                    
+
                     {/* Content */}
                     <div className="relative z-10 text-center text-white space-y-4 h-full flex flex-col justify-center">
                       <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
@@ -2068,7 +2065,7 @@ function App({ user = null }: AppProps) {
                 </div>
 
                 {/* Manual Registration Card */}
-                <div 
+                <div
                   onClick={() => isRegisteredDriver === true && licenseExpirationStatus !== 'expired' && handleRegistrationTypeSelect('manual')}
                   className={getButtonClassName(isRegisteredDriver === true && licenseExpirationStatus !== 'expired')}
                 >
@@ -2077,7 +2074,7 @@ function App({ user = null }: AppProps) {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
                     <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
                     <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full"></div>
-                    
+
                     {/* Content */}
                     <div className="relative z-10 text-center text-white space-y-4 h-full flex flex-col justify-center">
                       <div className="w-16 h-16 mx-auto bg-white/20 rounded-full flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
@@ -2144,25 +2141,25 @@ function App({ user = null }: AppProps) {
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Hidden input to maintain form data */}
-                  <input 
-                    type="hidden" 
-                    value={formData.driverName} 
+                  <input
+                    type="hidden"
+                    value={formData.driverName}
                     onChange={(e) => handleInputChange('driverName', e.target.value)}
                   />
-                  
+
                   {/* Manual trigger button for testing */}
                   {!formData.driverName && (
                     <button
                       type="button"
                       onClick={() => {
                         // Try multiple fallback methods to get the identifier
-                        const driverName = user?.mailNickname || 
-                                         user?.email?.split('@')[0] || 
-                                         user?.userPrincipalName?.split('@')[0] ||
-                                         user?.displayName?.replace(/\s+/g, '.').toLowerCase() ||
-                                         'unknown-user';
+                        const driverName = user?.mailNickname ||
+                          user?.email?.split('@')[0] ||
+                          user?.userPrincipalName?.split('@')[0] ||
+                          user?.displayName?.replace(/\s+/g, '.').toLowerCase() ||
+                          'unknown-user';
                         setFormData(prev => ({ ...prev, driverName }));
                       }}
                       className="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm"
@@ -2170,15 +2167,14 @@ function App({ user = null }: AppProps) {
                       手動で運転手名を設定 (Click to set: {user?.email?.split('@')[0] || 'unknown'})
                     </button>
                   )}
-                  
+
                   {formData.driverExpirationDate && (
                     <div className="mt-3 p-3 rounded-lg bg-white border border-blue-100">
                       <span className="text-gray-600 text-sm">免許証有効期限: </span>
-                      <span className={`font-semibold text-sm px-3 py-1 rounded-full ${
-                        isExpirationSoon(formData.driverExpirationDate) 
-                          ? 'text-red-700 bg-red-100 border border-red-200' 
-                          : 'text-green-700 bg-green-100 border border-green-200'
-                      }`}>
+                      <span className={`font-semibold text-sm px-3 py-1 rounded-full ${isExpirationSoon(formData.driverExpirationDate)
+                        ? 'text-red-700 bg-red-100 border border-red-200'
+                        : 'text-green-700 bg-green-100 border border-green-200'
+                        }`}>
                         {new Date(formData.driverExpirationDate).toLocaleDateString('ja-JP')}
                         {isExpirationSoon(formData.driverExpirationDate) && (
                           <span className="ml-2 text-xs animate-pulse">⚠️ 3ヶ月以内に期限切れ</span>
@@ -2194,20 +2190,20 @@ function App({ user = null }: AppProps) {
                     <span>👥</span>
                     確認者選択
                   </h2>
-                  
+
                   <div className="space-y-4">
                     <div className="bg-blue-50 p-4 rounded-lg">
                       <p className="text-sm text-blue-800 mb-2">
-                        <strong>あなたの役職：</strong> 
-                        {user?.role === 'SafeDrivingManager' ? '安全運転管理者' : 
-                         user?.role === 'Manager' ? '管理者' : '一般職員'}
+                        <strong>あなたの役職：</strong>
+                        {user?.role === 'SafeDrivingManager' ? '安全運転管理者' :
+                          user?.role === 'Manager' ? '管理者' : '一般職員'}
                       </p>
                       <p className="text-xs text-blue-600">
-                        {user?.role === 'EntryLevel' 
+                        {user?.role === 'EntryLevel'
                           ? '一般職員は上司を確認者として選択してください。'
                           : user?.role === 'Manager'
-                          ? '管理者は部下を確認者として選択できます。'
-                          : '安全運転管理者は部署のメンバーを確認者として選択できます。'
+                            ? '管理者は部下を確認者として選択できます。'
+                            : '安全運転管理者は部署のメンバーを確認者として選択できます。'
                         }
                       </p>
                     </div>
@@ -2216,7 +2212,7 @@ function App({ user = null }: AppProps) {
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         確認者を選択してください <span className="text-red-500">*</span>
                       </label>
-                      
+
                       <select
                         value={formData.selectedConfirmer}
                         onChange={(e) => {
@@ -2231,7 +2227,7 @@ function App({ user = null }: AppProps) {
                           </option>
                         ))}
                       </select>
-                      
+
                       {availableConfirmers.length === 0 && (
                         <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded">
                           <p className="text-sm text-yellow-800">
@@ -2251,7 +2247,7 @@ function App({ user = null }: AppProps) {
                           </button>
                         </div>
                       )}
-                      
+
                       {availableConfirmers.length > 0 && (
                         <div className="mt-2 text-xs text-gray-400">
                           {availableConfirmers.length} confirmers available: {availableConfirmers.map(c => `${c.name}(${c.role})`).join(', ')}
@@ -2406,7 +2402,7 @@ function App({ user = null }: AppProps) {
                     <h3 className="text-xl font-bold mb-6 text-gray-800">
                       安全運転宣言書
                     </h3>
-                    
+
                     {/* Checkboxes - Simplified */}
                     <div className="space-y-4 mb-8">
                       <label className="flex items-center p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-300 transition-all duration-200 cursor-pointer">
@@ -2508,31 +2504,30 @@ function App({ user = null }: AppProps) {
                     📸 写真撮影 <span className="text-red-500">*</span>
                   </h3>
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm font-medium">
-                    ⚠️「
-                    <span className="text-red-600">アルコールチェッカーの測定画面</span>
-                    と
-                    <span className="text-red-600">ご自身の顔</span>
-                    が
-                    <span className="text-red-600">一緒に映るように</span>
-                    写真を撮ってください。」
-                  </p>
+                    <p className="text-sm font-medium">
+                      ⚠️「
+                      <span className="text-red-600">アルコールチェッカーの測定画面</span>
+                      と
+                      <span className="text-red-600">ご自身の顔</span>
+                      が
+                      <span className="text-red-600">一緒に映るように</span>
+                      写真を撮ってください。」
+                    </p>
                   </div>
                   <div className="bg-white rounded-xl p-4 border border-gray-200">
                     <CameraCapture onImageSend={handleImageSend} autoOpen={true} />
                   </div>
-                  
+
                   {/* Upload Status */}
                   {uploadStatus && (
-                    <div className={`mt-4 p-3 rounded-lg text-sm ${
-                      uploadStatus.includes('✅') || uploadStatus.includes('完了しました') 
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : isImageUploading 
+                    <div className={`mt-4 p-3 rounded-lg text-sm ${uploadStatus.includes('✅') || uploadStatus.includes('完了しました')
+                      ? 'bg-green-100 text-green-700 border border-green-200'
+                      : isImageUploading
                         ? 'bg-blue-100 text-blue-700 border border-blue-200'
                         : isImageUploaded
-                        ? 'bg-green-100 text-green-700 border border-green-200'
-                        : 'bg-red-100 text-red-700 border border-red-200'
-                    }`}>
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-red-100 text-red-700 border border-red-200'
+                      }`}>
                       <div className="flex items-center gap-2">
                         {uploadStatus.includes('✅') || uploadStatus.includes('完了しました') ? (
                           <span>✅</span>
@@ -2555,7 +2550,7 @@ function App({ user = null }: AppProps) {
                     <h3 className="text-xl font-bold mb-6 text-gray-800">
                       カメラキャプチャ
                     </h3>
-                    
+
                     {/* Additional Input Fields */}
                     <div className="mb-8 space-y-6">
                       {/* Inspection Result - Use End fields for end/middle */}
@@ -2610,7 +2605,7 @@ function App({ user = null }: AppProps) {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Submit Button with Image Requirement Status */}
                 <div className="mt-8 space-y-4">
                   {/* Form Completion Status */}
@@ -2653,11 +2648,10 @@ function App({ user = null }: AppProps) {
                     type="button"
                     onClick={handleFormSubmission}
                     disabled={!isFormValid || isImageUploading}
-                    className={`w-full py-4 px-6 font-semibold rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transform transition-all duration-300 ${
-                      isFormValid && !isImageUploading
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 cursor-pointer shadow-lg hover:shadow-xl hover:scale-[1.02]'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
+                    className={`w-full py-4 px-6 font-semibold rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transform transition-all duration-300 ${isFormValid && !isImageUploading
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 cursor-pointer shadow-lg hover:shadow-xl hover:scale-[1.02]'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
                   >
                     <span className="flex items-center justify-center gap-2">
                       {isImageUploading && <span className="animate-spin">⏳</span>}
@@ -2679,14 +2673,14 @@ function App({ user = null }: AppProps) {
   if (currentView === 'submissions' && isAnyAdmin) {
     return (
       <div>
-        <SubmissionsManagement 
-          onBack={() => setCurrentView('main')} 
+        <SubmissionsManagement
+          onBack={() => setCurrentView('main')}
           canApprove={isFullAdmin}
           user={user}
         />
         {/* Sign Out Button for Submissions View */}
         <div className="fixed bottom-4 right-4">
-          <button 
+          <button
             onClick={signOut}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow-lg"
           >
@@ -2704,7 +2698,7 @@ function App({ user = null }: AppProps) {
         <AdminDriverManagement onBack={() => setCurrentView('main')} user={user} />
         {/* Sign Out Button for Admin View */}
         <div className="fixed bottom-4 right-4">
-          <button 
+          <button
             onClick={signOut}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow-lg"
           >
@@ -2722,7 +2716,7 @@ function App({ user = null }: AppProps) {
         <TempCSVUpload onBack={() => setCurrentView('main')} />
         {/* Sign Out Button for CSV Upload View */}
         <div className="fixed bottom-4 right-4">
-          <button 
+          <button
             onClick={signOut}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow-lg"
           >
@@ -2742,7 +2736,7 @@ function App({ user = null }: AppProps) {
         <ApprovalManagement onBack={() => setCurrentView('main')} user={tempUser} />
         {/* Sign Out Button for Approval View */}
         <div className="fixed bottom-4 right-4">
-          <button 
+          <button
             onClick={signOut}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow-lg"
           >
@@ -2760,7 +2754,7 @@ function App({ user = null }: AppProps) {
         <SafetyManagement onBack={() => setCurrentView('main')} user={tempUser} />
         {/* Sign Out Button for Safety View */}
         <div className="fixed bottom-4 right-4">
-          <button 
+          <button
             onClick={signOut}
             className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded shadow-lg"
           >
@@ -2798,12 +2792,12 @@ function App({ user = null }: AppProps) {
       <div className="max-w-4xl mx-auto p-6">
         {/* User Info with Navigation Links */}
         <div className="mb-6 text-right text-sm text-gray-600">
-                            ログイン中: ゲストユーザー (認証一時無効)
+          ログイン中: ゲストユーザー (認証一時無効)
           {isAnyAdmin && (
             <div className="mt-2 space-x-4">
               {isFullAdmin && (
                 <>
-                  <button 
+                  <button
                     onClick={() => setCurrentView('admin')}
                     className="text-blue-500 hover:text-blue-700 text-sm"
                   >
@@ -2820,7 +2814,7 @@ function App({ user = null }: AppProps) {
                 </>
               )}
               {isAnyAdmin && (
-                <button 
+                <button
                   onClick={() => setCurrentView('safety')}
                   className="text-green-500 hover:text-green-700 text-sm"
                 >
@@ -2841,7 +2835,7 @@ function App({ user = null }: AppProps) {
         {/* Vehicle Usage Form */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-lg font-bold mb-6 bg-blue-100 p-3 rounded">使用車両</h2>
-          
+
           {/* Driver Name - Auto-populated from Azure AD */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2974,7 +2968,7 @@ function App({ user = null }: AppProps) {
         {isVehicleFormValid && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-lg font-bold mb-6 bg-blue-100 p-3 rounded">安全運転宣言書</h2>
-            
+
             {/* Checkboxes */}
             <div className="space-y-4 mb-6">
               <label className="flex items-center">
@@ -3074,11 +3068,11 @@ function App({ user = null }: AppProps) {
                 写真撮影
               </h3>
               <div className="bg-white rounded-xl p-4 border border-gray-200">
-      <CameraCapture onImageSend={handleImageSend} />
+                <CameraCapture onImageSend={handleImageSend} />
               </div>
             </div>
             <h2 className="text-lg font-bold mb-4">カメラキャプチャ</h2>
-            
+
             {/* Additional Input Fields */}
             <div className="mb-6 space-y-4">
               {/* Inspection Result */}
@@ -3136,19 +3130,18 @@ function App({ user = null }: AppProps) {
             >
               🧪 TEST SUBMIT (Always Enabled)
             </button>
-            
+
             <button
               onClick={handleFormSubmission}
               disabled={!isFormValid}
-              className={`w-full py-3 px-6 rounded-md font-medium transition-colors ${
-                isFormValid
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
+              className={`w-full py-3 px-6 rounded-md font-medium transition-colors ${isFormValid
+                ? 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
             >
               送信 (Original)
             </button>
-            
+
             {!isFormValid && (
               <div className="mt-3 text-center text-sm text-gray-500">
                 <p>すべての必須項目を入力してから送信してください：</p>
@@ -3170,28 +3163,27 @@ function App({ user = null }: AppProps) {
         )}
 
         {/* Status Messages */}
-      {uploadStatus && (
-          <div className={`p-4 rounded-md mb-4 ${
-            uploadStatus.includes('失敗') || uploadStatus.includes('failed') 
-              ? 'bg-red-100 text-red-700 border border-red-300' 
-              : 'bg-green-100 text-green-700 border border-green-300'
-          }`}>
-          <div className="flex items-center gap-2">
-            {uploadStatus.includes('✅') || uploadStatus.includes('完了しました') ? (
-              <span>✅</span>
-            ) : uploadStatus.includes('失敗') || uploadStatus.includes('failed') ? (
-              <span>❌</span>
-            ) : (
-              <span>ℹ️</span>
-            )}
-            <span>{uploadStatus}</span>
+        {uploadStatus && (
+          <div className={`p-4 rounded-md mb-4 ${uploadStatus.includes('失敗') || uploadStatus.includes('failed')
+            ? 'bg-red-100 text-red-700 border border-red-300'
+            : 'bg-green-100 text-green-700 border border-green-300'
+            }`}>
+            <div className="flex items-center gap-2">
+              {uploadStatus.includes('✅') || uploadStatus.includes('完了しました') ? (
+                <span>✅</span>
+              ) : uploadStatus.includes('失敗') || uploadStatus.includes('failed') ? (
+                <span>❌</span>
+              ) : (
+                <span>ℹ️</span>
+              )}
+              <span>{uploadStatus}</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
         {/* Sign Out Button - Always visible in main view */}
         <div className="text-center mt-8">
-          <button 
+          <button
             onClick={signOut}
             className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded"
           >

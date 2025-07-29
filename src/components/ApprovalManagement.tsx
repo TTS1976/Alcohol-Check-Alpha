@@ -134,7 +134,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         result = await getSubmissionsByConfirmerPaginated({
           confirmerId: userIdentifier,
           approvalStatus: 'PENDING',
-          limit: 1000, // FIXED: Increased from 200 to 1000 to match working home page
+          limit: 20000, // FIXED: Increased to 20000 for large datasets
           sortDirection: 'DESC'
         });
       }
@@ -201,7 +201,7 @@ const ApprovalManagement: React.FC<ApprovalManagementProps> = ({ onBack, user })
         result = await getSubmissionsByConfirmerPaginated({
           confirmerId: userIdentifier,
           approvalStatus: 'PENDING',
-          limit: 1000, // FIXED: Increased from 50 to 1000 to match working home page
+          limit: 20000, // FIXED: Increased to 20000 for large datasets
           nextToken: nextToken,
           sortDirection: 'DESC'
         });
