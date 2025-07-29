@@ -255,6 +255,40 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
     }
   };
 
+  // NEW: Load entire database with one click
+  const loadEntireDatabase = async () => {
+    setIsLoading(true);
+    try {
+      logger.debug('Loading entire database...');
+      setStatus('全データベースを読み込み中...');
+
+      const result = await getSubmissionsPaginated({
+        ...(isAdmin ? {} : { submittedBy: user?.mailNickname || user?.email }),
+        limit: 20000, // Load entire database
+        excludeRejected: true,
+        sortDirection: 'DESC'
+      });
+
+      logger.debug(`Loaded ${result.items.length} submissions from entire database`);
+
+      setCurrentSubmissions(result.items);
+      setAllSubmissions(result.items);
+      setNextToken(result.nextToken);
+      setHasMore(result.hasMore);
+      setTotalLoaded(result.items.length);
+      setStatus(`✅ 全データベースから${result.items.length}件の申請を読み込みました`);
+
+      // Fetch related submissions for all items
+      await fetchRelatedSubmissions(result.items);
+
+    } catch (error) {
+      logger.error('Failed to load entire database:', error);
+      setStatus('全データベースの読み込みに失敗しました: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // NEW: Load submissions with specific filters
   const loadFilteredSubmissions = async () => {
     setIsLoading(true);
@@ -882,6 +916,26 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({ onBack, user: _user
                   ) : (
                     <>
                       📥 過去の申請を読み込み
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Load Entire Database Button */}
+              {!searchTerm && !dateFrom && !dateTo && statusFilter === 'all' && (
+                <button
+                  onClick={loadEntireDatabase}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-md transition-colors text-sm"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      読み込み中...
+                    </>
+                  ) : (
+                    <>
+                      🗄️ 全データベース読み込み
                     </>
                   )}
                 </button>
